@@ -1,6 +1,22 @@
+class Message:
+    def __init__(self, sender, recipient, data):
+        self.sender = sender
+        self.recipient = recipient
+        self.data = data 
+
+    @staticmethod
+    def createMessageFromBuffer(header):
+        #break down raw packet and construct message
+        sender = header[1]
+        recipient = header[2]
+        data = header[3]
+        return Message(sender, recipient, data)
+
+
+
 import threading
 import socket
-import Message
+
 host = '127.0.0.1'
 port = 59000
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

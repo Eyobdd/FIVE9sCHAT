@@ -11,5 +11,3 @@ class Message:
         recipient = header[2]
         data = header[3]
         return Message(sender, recipient, data)
-
-    def createBufferFromMessage():

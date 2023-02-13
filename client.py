@@ -37,7 +37,6 @@ def client_receive():
 
 
 def client_send():
-    firstMessage = True
     while True:
         inp = input("What would you like to say? To whom?\n")
         if "->" not in inp:

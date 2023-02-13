@@ -1,15 +1,25 @@
 import threading
 import socket
+import Message
 host = '127.0.0.1'
 port = 59000
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind((host, port))
 server.listen()
-clients = []
-aliases = []
-clientID = {}
-loginStatus = {}
-queuedMessages = {}
+clients = [] #live users [client_socket, client_socket]
+aliases = [] 
+clientID = {} # Now: [alias: client_socket] Future -> [userID: User(), userID: User()]
+
+#Class User
+# client
+# queuedMessages [Message()]
+# deque --> 
+
+loginStatus = {} #[alias: T or F]
+#[A: T, B: F, C: F, D: T]
+#Send User X
+
+queuedMessages = {} #[alias:[Message(), Message(), Message()]
 
 
 def broadcast(message):
@@ -17,20 +27,25 @@ def broadcast(message):
         client.send(message)
 
 # Function to handle clients'connections
-
 def sendToClient(alias, message):
     client = clientID[alias]
     client.send(message)
 
 
-def unPackMessage(client, data):
-
+def unPackMessage(data):
     decodedM = data.decode('UTF-8').split("->")
     sender = decodedM[0]
-    deliver = decodedM[1].strip()
-    deliver = deliver.encode('UTF-8')
+    recipient = decodedM[1].strip()
+    recipient = recipient.encode('UTF-8')
     message = (sender + " says -> " + decodedM[2]).encode('UTF-8')
-    return deliver, message
+    return recipient, message
+
+def protocol(data):
+    "M:SENDER:RECIPIENT:MESSAGE"
+    dataSplit = data.decode('UTF-8').split(":")
+    type_ = dataSplit[0]
+    if type_ == "M":
+        return Message.createMessageFromBuffer(dataSplit)
 
 
 def handle_client(client):
@@ -39,24 +54,35 @@ def handle_client(client):
             index = clients.index(client)
             alias = aliases[index]
             data = client.recv(1024)
-            deliver,message = unPackMessage(client, data)
-            if deliver not in loginStatus:
+            obj = protocol(data)
+            # UNPACK 
+            # Get type
+            # Check if type is message, command, etc... 
+            # Return message or command or etc... obj
+            # Check what type of object our unpack function returned 
+            # Act on message or command or etc... () Can be under the hood
+
+            recipient, message = unPackMessage(data)
+            if recipient not in loginStatus:
                 client.send(("The user you are trying to contact does not exist.").encode('UTF-8'))
-            elif not loginStatus[deliver]:
-                notlogin = deliver.decode('UTF-8') + " is not logged in."
+            # Check if user is logged in
+            elif not loginStatus[recipient]:
+                notlogin = recipient.decode('UTF-8') + " is not logged in."
                 notlogin = notlogin.encode('UTF-8')
                 client.send(notlogin)
-                if deliver not in queuedMessages.keys():
-                    queuedMessages[deliver] = []
-                queuedMessages[deliver].append(message)
-            elif (deliver in clientID) and (clientID[deliver] in clients):
-                sendToClient(deliver, message)
+                if recipient not in queuedMessages.keys():
+                    queuedMessages[recipient] = []
+                queuedMessages[recipient].append(message)
+            #If user is active
+            elif (clientID[recipient] in clients):
+                sendToClient(recipient, message)
             else:
                 print(clientID.keys())
-                print(deliver + " does not exist")
+                print(recipient + " does not exist")
                 broadcast(data)
 
         except:
+            # Client Logs out or Crashes
             index = clients.index(client)
             clients.remove(client)
             client.close()

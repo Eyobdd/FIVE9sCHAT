@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package grpc;
+
+message Empty {}
+
+message Note {
+    string sender = 1;
+    string message = 2;
+    string recipient = 3;
+}
+
+message Account {
+    string username = 1;
+    bool created = 2;
+    bool loggedIn = 3;
+}
+
+service ChatServer {
+    // This bi-directional stream makes it possible to send and receive Notes between 2 persons
+    rpc ChatStream (Account) returns (stream Note);
+    rpc createAccount (Account) returns (Account);
+    rpc deleteAccount (Account) returns (Note);
+    rpc listAccounts (Empty) returns (Account);
+    rpc login(Account) returns (Account);
+    rpc sendNote (Note) returns (Note); 
+    rpc dequeue (Account) returns (Note);
+}

@@ -5,6 +5,9 @@
 # 4. Comment code (Eyob on socket), (Aneesh on GRPC)
 # 5. Clean up code
 # 6. Write decision documentation (Eyob on Socket), (Aneesh on GRPC), (Aneesh on intro and design strategy)
+# 7. Add Go Back in the Create or Login window -> (Eyob on Socket), (Aneesh on GRPC)
+# 8. Add Broadcast in GPRC
+# 9. Create Uniform Error Code System
 
 
 

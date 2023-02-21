@@ -1,19 +1,21 @@
-HEADER_LENGTH = 1024
+HEADER_LENGTH = 10
 
 class Message:
-    def __init__(self, sender, recipient, data):
+    def __init__(self, recipient, sender, message):
         self.sender = sender
         self.recipient = recipient
-        self.data = data 
+        self.data = message 
 
-    def send():
-        header = f"{len(data) :< {HEADER_LENGTH}}".encode('utf-8')
-        encoded_message = f"M:{sender}:{data}".encode('utf-8')
-        recipient.send(header+encoded_message)
+    def encode(self):
+        encoded_message = f"M:{self.recipient}:{self.sender}:{self.data}".encode('utf-8')
+        header = f"{len(encoded_message) :< {HEADER_LENGTH}}".encode('utf-8')
 
+        return header+encoded_message
+    
     @staticmethod
     def createMessageFromBuffer(header):
         #break down raw packet and construct message
+        header = header.split(":")
         sender = header[1]
         recipient = header[2]
         data = header[3]

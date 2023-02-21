@@ -1,45 +1,44 @@
-HEADER_LENGTH = 1024
+HEADER_LENGTH = 10
 
 class Account:
     def __init__(self, socket,username):
-        self.socket = user_socket
+        self.socket = socket
         self.username = username
         self.online = True
         self.queuedMessages = []
 
-    def sendConfirmation(socket,message):
-        message = f"M:{username}:SERVER:{message}".encode('utf-8')
-        header = f"{len(message) :< {HEADER_LENGTH}}".encode('utf-8')
-        socket.send(header+message)
+    def sendConfirmation(self,socket,message):
+        message = f"M:{self.username}:SERVER:{message}".encode('utf-8')
+        socket.send(message)
 
-
-    def deliverQueuedMessages():
-        if queuedMessages == []:
-            return sendConfirmation(socket,"No waiting messages!")
+    def deliverQueuedMessages(self):
+        if self.queuedMessages == []:
+            return self.sendConfirmation(self.socket,"No waiting messages!")
         for message in queuedMessages:
             message.send()
             queuedMessages = []
 
     # TODO this function needs to move outside of the account object
-    def login(exists,client):
+    def login(self, exists,client):
         if not exists:
-            return sendConfirmation(client,"User does not exist!")
+            return self.sendConfirmation(client,"User does not exist!")
         online = True
-        return sendConfirmation(client,"User Logged in Successfully")
+        return self.sendConfirmation(client,"User Logged in Successfully")
 
-    def logout():
+    def logout(self):
         online = False
-        socket.close()
+        self.socket.close()
         
 
-    def delete(exists):
+    def delete(self,exists, clientDict):
         if not exists:
-            return sendConfirmation(socket,"User unable to be deleted!")
-        sendConfirmation(socket,"Account successfully deleted!")
-        socket.close()
+            self.sendConfirmation(self.socket,"User unable to be deleted!")
+        else:
+            self.sendConfirmation(self.socket,"Account successfully deleted!")
+            self.socket.close()
 
-    def queueMessage(message_obj):
-        queuedMessages.append(message_obj)
+    def queueMessage(self,message_obj):
+        self.queuedMessages.append(message_obj)
 
 
     @staticmethod

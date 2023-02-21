@@ -1,13 +1,14 @@
 HEADER_LENGTH = 10
 
-class Account:
-    def __init__(self, socket,username):
+class Command:
+    def __init__(self, socket, data, username,type_):
         self.socket = socket
         self.username = username
-        self.online = True
-        self.queuedMessages = []
+        self.actionType = type_
+        self.data = data
 
     def sendConfirmation(self,socket,message):
+
         message = f"M:{self.username}:SERVER:{message}".encode('utf-8')
         socket.send(message)
 
@@ -35,7 +36,9 @@ class Account:
             self.sendConfirmation(self.socket,"User unable to be deleted!")
         else:
             self.sendConfirmation(self.socket,"Account successfully deleted!")
-            self.socket.close()
+            self.socket.close()        
+
+
 
     def queueMessage(self,message_obj):
         self.queuedMessages.append(message_obj)

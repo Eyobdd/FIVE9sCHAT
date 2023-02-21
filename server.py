@@ -2,6 +2,7 @@ import threading
 import socket
 import random
 from message import Message
+from command import Command
 HEADER_LENGTH = 10
 
 
@@ -27,10 +28,6 @@ loginStatus = {} #[username: T or F]
 
 queuedMessages = {} #[username:[Message(), Message(), Message()]
 
-def encoded_message(message):
-    message = message.encode('utf-8')
-    header = f"{len(message) :< {HEADER_LENGTH}}".encode('utf-8')
-    return header+message
 
 # TODO Login and Register will need to be in another earlier function
 def protocol_action(obj):
@@ -57,166 +54,112 @@ def protocol_action(obj):
             success = Message(obj.sender, "SERVER", success)
             sendToClient(obj.recipient, obj.encode())
             sendToClient(obj.sender, success.encode())
+    
+    if isinstance(obj, Command):
 
-    # else:
-    #     # must be an account
-    # match type_ :
-
-    #     # Message type -> call send message on object
-    #     case "M":
-    #         recipient = data[1]
-
-    #         # Does recipient exist?
-    #         if recipient in clientDict:
-
-    #             recipient_account = clientDict[recipient]
-    #             recipient_online = recipient_account.online
+        if obj.actionType == "DA":
+            
+            # user doesn't exist? THIS MAY BE REDUNDANT CAUSE USER MUST EXIST TO MAKE CALL
+            if obj.username not in clientID:
+                failure = "Account-Does-Not-Exist"
+                failure = Message(obj.username,"SERVER",failure)
+                sendToClient(obj.username,failure.encode())
                 
-    #             # if recipient online -> send message
-    #             if recipient_online: 
-    #                 obj.send()
-    #             # if recipient offline -> queue messsage
-    #             else:
-    #                 recipient_account.queueMessage(obj)
-    #         else:
-    #             # TODO Send Error to sender!
-    #             sender = data[2]
-    #             sender_account = clientDict[sender]
-    #             sender_account.sendConfirmation(sender_account.socket,"User does not exist!")
+            # user exists
+            else:
+                
+                # Send confirmation to user
+                success = "Account-Successfully-Deleted"
+                success = Message(obj.username, "SERVER", success)
+                sendToClient(obj.username, success.encode())
+
+                # Close socket - note disconnection of socket will automatically remove user from clients and usernames
+
+                # remove user from lists
+                print("loginstatus before deleting", loginStatus)
+                del loginStatus[obj.username]
+                del clientID[obj.username]
+                print("loginstatus after deleting", loginStatus)
+
+                # only delete from queued messages if user had queued messages. 
+                if obj.username in queuedMessages.keys():
+                    del queuedMessages[obj.username]
+
+                
+        elif obj.actionType == "LA":
+            ## Generate account list
+
+            # obj.data {username: loginstatus}
+            allAccounts = 'LA|'
+            print("OBJECT DATA:", obj.data)
+            print("LOGIN STATUS:", loginStatus)
+            for account in obj.data:
+                #  username is active
+                if obj.data[account]:
+                    status = 'active'
+                # username is not active
+                else:
+                    status = 'inactive'
+                allAccounts += account + " ( " + status + " )" + "|"
+            if len(allAccounts) > len("LA|"):
+                allAccounts = allAccounts[:-1]
+            allAccounts = Message(obj.username, "SERVER", allAccounts)
+            sendToClient(obj.username, allAccounts.encode())
 
 
-    #     # Login type -> call login method on object // TODO IDK if this is true but its late I will fix tmr need to do more logic on this side
-    #     case "L":
-    #         if obj.exists:
-    #             # find the account via username and login
-    #             obj.account_obj.login(obj.exists,client)
-    #         else:
-    #             # sends login error
-    #             account.Account.login(obj.exists,client)
-
-    #     # Delete type -> call delete method on object
-    #     case "D":
-    #         username = data[1]
-    #         if obj.exists:
-    #             # deletes object from account dictionary
-    #             del clientDict[username]
-    #             # send confirmation and closes client socket
-    #             obj.delete(obj.exists)
-    #         else:
-    #             # Sends error message
-    #             account.Account.delete(obj.exists)
-
-    #     case "R":
-    #         username = data[1]
-
-    #         if obj.is_taken:
-    #             message = f"M:{username}:SERVER:Username is unavailible".encode('utf-8')
-    #             header = f"{len(message) :< {HEADER_LENGTH}}".encode('utf-8')
-    #             client.send(header+message)
-    #         else:
-    #             clientDict[username] = obj.account_obj
-        
-
-def protocol_unpack(data):
+def protocol_unpack(data,client):
     data = data.decode('UTF-8')
-    type_ = data[0]
+    dataSplit = data.split(":")
+    type_ = dataSplit[0]
     print("UNPACK-TYPE:",type_)
     match type_:
 
         case "M":
             return Message.createMessageFromBuffer(data)
         
-        #  # Register type -> call register method
-        # case "R":
-        #     username = data[1]
-        #     is_taken = username in clientDict
-        #     #obj = account.Account.registerAccount(client,is_taken,username)
+        case "LA":
+            username = dataSplit[1]
 
-        #     #return {"is_taken": is_taken,"account_obj": obj}
-        
-        # case "L":
-        #     username = data[1]
-        #     if username in clientDict:
-        #         return {"exists": True, "account_obj": clientDict[username]}
-        #     return {"exists": False} 
+            #TODO Implement createCommandFromBuffer
+            # usage -> Command.createCommandFromBuffer(client, external_data, data)
+            return Command(client, loginStatus, username, type_)
 
-        # case "D":
-        #     username = data[1]
-        #     if username in clientDict:
-        #         return {"exists": True, "account_obj": clientDict[username]}
-        #     return {"exists": False} 
+        case "DA":
 
+            #TODO Implement createCommandFromBuffer
+            username = dataSplit[1]
+            return Command(client, None ,username,type_)
+                
 def broadcast(message):
     for client in clients:
         index = clients.index(client)
         username = usernames[index]
-        message = f"M:{username}:SERVER:{message}"
-        message = encoded_message(message)
-        client.send(message)
+
+        message = Message(username, "SERVER", message)
+        
+        client.send(message.encode())
 
 # Function to handle clients'connections
 def sendToClient(username, message):
-    # print("username is " + username)
-    # print("These are the clientID Dictionary ")
-    # print(clientID)
-
+    
     client = clientID[username]
     client.send(message)
 
 
-def unPackMessage(data):
-    decodedM = data.decode('UTF-8').split("->")
-    sender = decodedM[0]
-    recipient = decodedM[1].strip()
-    recipient = recipient.encode('UTF-8')
-    message = (sender + " says -> " + decodedM[2]).encode('UTF-8')
-    return recipient, message
-
-def protocol(data):
-    "M:SENDER:RECIPIENT:MESSAGE"
-    dataSplit = data.decode('UTF-8').split(":")
-    type_ = dataSplit[0]
-    if type_ == "M":
-        return Message.createMessageFromBuffer(dataSplit)
+# def unPackMessage(data):
+#     decodedM = data.decode('UTF-8').split("->")
+#     sender = decodedM[0]
+#     recipient = decodedM[1].strip()
+#     recipient = recipient.encode('UTF-8')
+#     message = (sender + " says -> " + decodedM[2]).encode('UTF-8')
+#     return recipient, message
 
 
-def handle_client(client):        
-    while True:
-        try:
-
-            header = client.recv(HEADER_LENGTH).decode("utf-8").strip()
-            data_length = int(header)
-            data = client.recv(data_length)
-            # print("HANDLE CLIENT DATA:",data)
-            obj = protocol_unpack(data)
-            protocol_action(obj)
-
-        except:
-            # Client Logs out or Crashes
-            index = clients.index(client)
-            clients.remove(client)
-            client.close()
-            username = usernames[index]
-            # print("USERNAME:",username)
-            loginStatus[username] = False
-            # print("LOGINSTATUSLIST:",loginStatus)
-            # print("USER LOGINSTATUS:", loginStatus[username])
-            broadcast(f'{username} has left the chat room!')
-            usernames.remove(username)
-            break
-# Main function to receive the clients connection
-
-def receive():
-    while True:
-        print('Server is running and listening ...')
-        client, address = server.accept()
-        print(f'connection is established with {str(address)}')
-        print((f'connection is established with CLIENT'))
-        print(client)
-        # message = f'M:new_user:SERVER:username?'.encode('utf-8')
-        # header = f"{len(message) :< {HEADER_LENGTH}}".encode('utf-8')
-        # client.send(header+message)
-        
+def handle_client(client):
+    client_auth = False
+    # Validation - conditions -> while not auth
+    while not client_auth:
+         
         data = client.recv(HEADER_LENGTH).decode('utf-8')
         # print("DATA 1:", data)
         data_length = int(data.strip())
@@ -249,6 +192,7 @@ def receive():
                 success = Message(username, "SERVER", success)
                 client.send(success.encode())
                 onConnection(username)
+                client_auth = True
         elif type_ == "L":
             # Attempting to login
 
@@ -272,14 +216,53 @@ def receive():
                 success = Message(username, "SERVER", success)
                 client.send(success.encode())
                 onConnection(username)
+                client_auth = True
+    # Normal
+    while True:
+        try:
+            header = client.recv(HEADER_LENGTH).decode("utf-8").strip()
+            data_length = int(header)
+            data = client.recv(data_length)
+            # print("HANDLE CLIENT DATA:",data)
+            obj = protocol_unpack(data,client)
+            protocol_action(obj)
 
+        except:
+            # Client Logs out or Crashes
+            index = clients.index(client)
+            clients.remove(client)
+            client.close()
+            username = usernames[index]
+            # print("USERNAME:",username)
+            
+            # Check this problem on GRPC 
+            if username in loginStatus:
+                loginStatus[username] = False
+            # print("LOGINSTATUSLIST:",loginStatus)
+            # print("USER LOGINSTATUS:", loginStatus[username])
+            broadcast(f'{username} has left the chat room!')
+            usernames.remove(username)
+            break
+# Main function to receive the clients connection
+
+def receive():
+    while True:
+        print('Server is running and listening ...')
+        client, address = server.accept()
+        print(f'connection is established with {str(address)}')
+        print((f'connection is established with CLIENT'))
+        print(client)
+        # message = f'M:new_user:SERVER:username?'.encode('utf-8')
+        # header = f"{len(message) :< {HEADER_LENGTH}}".encode('utf-8')
+        # client.send(header+message)
        
         thread = threading.Thread(target=handle_client, args=(client,))
         thread.start()
 
 def onConnection(username):
     # print(f'The username of this client is {username}')
-    message = encoded_message(f'{username} has connected to the chat room')
+    message = f'{username} has connected to the chat room'
+    broadcast(message)
     #broadcast(message)
     if username in queuedMessages.keys():
         for message in queuedMessages[username][:]:

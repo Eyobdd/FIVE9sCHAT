@@ -6,7 +6,7 @@ from command import Command
 
 # Constants
 HEADER_LENGTH = 10
-HOST = '10.250.92.212'
+HOST = '10.250.52.110'
 PORT = 12340
 
 # Connect sockets to server

@@ -239,89 +239,120 @@ def handle_client(client):
                 success = Message(username, "SERVER", success)
                 client.send(success.encode())
 
-            # 
+            # If username doesn't exist -> Send client account creation confirmation
             else:
-                # Account is succesffuly created and logged in 
+
+                # Adds user to the server and logs them in
                 usernames.append(username)
                 clients.append(client)
                 clientID[username] = client
                 loginStatus[username] = True
+
+                # Sends account creation confirmation
                 success = "Successful-Account-Creation."
                 success = Message(username, "SERVER", success)
                 client.send(success.encode())
+
+                # Broadcasts new connection and authenticates connection
                 onConnection(username)
                 client_auth = True
-        elif type_ == "L":
-            # Attempting to login
 
-            # User does not exist.
+
+        # If type is L -> attempt to Login in with username
+        elif type_ == "L":
+
+            # If user does not exist -> send client login failure message
             if username not in loginStatus:
                 failed = "Login-Failed"
                 failed = Message(username,"SERVER", failed)
                 client.send(failed.encode())
-            # User is already active.
+
+            # If user is already active -> alert client!
             elif loginStatus[username]:
-                # error message that user is already logged in another machine
                 active = "Account-Already-Active"
                 active = Message(username, "SERVER", active)
                 client.send(active.encode())
+
+            # If username exists and is not active -> log user in
             else:
+                # Log user in
                 clients.append(client)
                 usernames.append(username)
                 clientID[username] = client
                 loginStatus[username] = True
+
+                # Send confirmation message
                 success = "Login-Successful."
                 success = Message(username, "SERVER", success)
                 client.send(success.encode())
+
+                # Broadcast connection and deliver messages and authenticate client
                 onConnection(username)
                 client_auth = True
-    # Normal
+
+    # Receives buffers from client and applies wire protocol
     while True:
         try:
+            # Receives bits from client and converts to buffer(encoded)
             header = client.recv(HEADER_LENGTH).decode("utf-8").strip()
             data_length = int(header)
             data = client.recv(data_length)
-            # print("HANDLE CLIENT DATA:",data)
+
+            # Applies wire protocol to buffer -> returns a Message() or Command() objects
             obj = protocol_unpack(data,client)
+
+            # Applies an action to the object
             protocol_action(obj)
 
+
+        # This exception handles client crashes and logouts
         except:
-            # Client Logs out or Crashes
+
+            # Removes client from active user lists
             index = clients.index(client)
             clients.remove(client)
-            client.close()
+
+            # Get clients username and then remove them from active user lists
             username = usernames[index]
-            # print("USERNAME:",username)
+            usernames.remove(username)
+
             
-            # Check this problem on GRPC 
+            # Only change loginStatus is user account isn't deleted
             if username in loginStatus:
                 loginStatus[username] = False
-            # print("LOGINSTATUSLIST:",loginStatus)
-            # print("USER LOGINSTATUS:", loginStatus[username])
-            broadcast(f'{username} has left the chat room!')
-            usernames.remove(username)
-            break
-# Main function to receive the clients connection
 
+            # Broadcast to everyone that the client disconnected
+            broadcast(f'{username} has left the chat room!')
+            break
+
+
+# receive() listens for client connections and starts new threads when found
 def receive():
+
+    # When server starts
+    print('Server is running and listening ...')
+
     while True:
-        print('Server is running and listening ...')
+
+        # Accepts new client on client connection
         client, address = server.accept()
-        print(f'connection is established with {str(address)}')
-        print((f'connection is established with CLIENT'))
-        print(client)
-        # message = f'M:new_user:SERVER:username?'.encode('utf-8')
-        # header = f"{len(message) :< {HEADER_LENGTH}}".encode('utf-8')
-        # client.send(header+message)
-       
+        
+        # Logs client connection information
+        print(f'connection is established with: {str(address)}')
+        print((f'connection is established with CLIENT :\n{client}'))
+
+        # Creates a new thread to handle client-server communication
         thread = threading.Thread(target=handle_client, args=(client,))
         thread.start()
 
+# onConnection() broadcasts a username and dequeues their messages
 def onConnection(username):
-    # print(f'The username of this client is {username}')
+
+    # User connection broadcast
     message = f'{username} has connected to the chat room'
     broadcast(message)
-    #broadcast(message)
+
+    # Dequeuing of stored user messages
     if username in queuedMessages.keys():
         for message in queuedMessages[username][:]:
             sendToClient(username, message.encode())

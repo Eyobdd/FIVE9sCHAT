@@ -114,137 +114,177 @@ try:
 
                 else:
 
-                    # Reset username
-                    username = ''
-                    
                     # Print confirmation message
                     print(bcolors.FAIL + confirmation + bcolors.ENDC)
 
-            # If user submits a real
+            # If user submits a real username and command type is L
             elif username != "!":
                 
-                # User 
+                # Send Login request to server
                 request_message = f"L:{username}"
                 request_message = encoded_message(request_message)
                 client.send(request_message)
 
+                # Awaits and recieves confirmation from server
                 header = client.recv(HEADER_LENGTH).decode('utf-8').strip()
-                # print("HEADER:",header)
                 confirmation_length = int(header.strip())
                 confirmation = client.recv(confirmation_length).decode('utf-8')
 
+                # Retrieve confirmation message
                 confirmation = confirmation.split(":",3)[3]
 
+                # Checks if request is successful
                 if confirmation == "Login-Successful.":
+                    # User is authorized
                     auth = True
                     goBack = False
+                    
+                    # Print confirmation message
                     print(bcolors.OKGREEN + confirmation + bcolors.ENDC)
+
                 else:
+                    
+                    # Print confirmation message
                     print(bcolors.FAIL + confirmation + bcolors.ENDC)
+            
+            # If username is !, break out of auth loop and reprompt commands
             else:
                 break            
 
-
+    # Thread that listens for communications from the server
     def client_receive():
         while True:
             try:
+
+                # Receives data sent by server
                 data_header = client.recv(HEADER_LENGTH).decode('utf-8')
-                # print("HEADER:",data_header)
                 data_length = int(data_header.strip())
                 data = client.recv(data_length).decode('utf-8')
-                # print("INCOMING DATA "+str(data)+ "\n")
+
+                # Converts received data into a message object
                 data = Message.createMessageFromBuffer(data)
-                # Check for server messages
+
+                # Checks if message sender is SERVER
                 if (data.sender == "SERVER"):
+                    
+                    # If message object doesn't encode properly
                     if data.data[0] == "<":
                         continue
+
+                    # If SERVER is sending a list of active accounts
                     if data.data[0:3] == "LA|":
+
+                        # Unpacks the sent list 
                         allAccounts = data.data.split("|")[1:]
+                        
+                        # Prints list
                         print(bcolors.OKGREEN + "The server holds the following accounts." + bcolors.ENDC)
                         for account in allAccounts:
                             print(" -- > " + account)
 
-                    elif data.data == "Login-Successful":
-                        auth = True
-                        print(bcolors.OKGREEN + data.data + bcolors.ENDC)
-                    elif data.data == "Login-Failed":
-                        print(bcolors.FAIL + data.data + bcolors.ENDC)
-                    elif data.data == "Successful-Account-Creation.":
-                        auth = True
-                        print(bcolors.OKGREEN + data.data + bcolors.ENDC)
-                    elif data.data == "Username-Already-Exists.":
-                        print(bcolors.FAIL + data.data + bcolors.ENDC)
+                    # If SERVER Confirms account is successfully deleted
                     elif data.data == "Account-Successfully-Deleted":
+
+                        # Print message to console
                         print("Your account has been deleted. Your client connection will end. Bye, Bye")
                         print(bcolors.BOLD + bcolors.FAIL + "EXITING CLIENT PROGRAM." + bcolors.ENDC)
+                        
+                        # Exits terminal and closes socket
                         os.kill(os.getpid(), signal.SIGINT)
+                    
+                    # If SERVER cannot find and delete account 
                     elif data.data == "Account-Does-Not-Exist":
                         print(bcolors.FAIL + data.data + bcolors.ENDC)
+
+                    # If SERVER is sending a broadcast message
                     else:
                         print(bcolors.OKCYAN + "[" + data.sender + "] " + bcolors.ENDC + data.data)
 
 
-                # TODO Print errors in red - check if message is an error
-
-                # TODO we should catch all server messages from above -- so we should say if data.sender is not SERVER
+                # If the message is sent from another user
                 if data.sender != "SERVER":
                     print(bcolors.OKCYAN + "[" + data.sender + "] " + bcolors.ENDC + data.data)
 
+            # Any general errors are caught here
             except Exception as e:
                 print(bcolors.WARNING +'Error! '+ str(e) + bcolors.ENDC)
                 client.close()
                 break       
 
+
+    # Thread that sends authenticated communication to the server
     def client_send():
         
         while True:
+
+            # Asks user for input
             inp = input(bcolors.BOLD +"COMMANDS" + bcolors.ENDC + ": " + bcolors.BOLD + "\n" +"LA" + bcolors.ENDC + " - List accounts. "+ bcolors.BOLD + "\n" + "USERNAME-> MESSAGE" + bcolors.ENDC+ " - Send USERNAME MESSAGE." + "\n" + bcolors.BOLD + "DA" + bcolors.ENDC + " - Delete your account."+"\n" + bcolors.BOLD + "Q" + bcolors.ENDC + " - Quit client program."+"\n")
+            
+            # If user enters nothing
             if inp == "":
-                print(bcolors.Warning + "Empty input" + bcolors.ENDC)
+                print(bcolors.WARNING + "Empty input" + bcolors.ENDC)
+            
+            # User enters something
             else:
+
+                # If input is not a message
                 if "->" not in inp:
+
+                    # Check if it List Accounts request
                     if inp == "LA":
-                        # List Accounts
+
+                        # Sends List Accounts request
                         message = f"LA:{username}"
                         message = encoded_message(message)
                         client.send(message)
                         
+                    # Check if it is a Delete Account request
                     elif inp == "DA":
-                        # Delete Account
                         
-                        # Uses the authorized username
+                        # Sends delete account request with authorized username
                         message = f"DA:{username}"
                         message = encoded_message(message)
                         client.send(message)
 
+                    # Check if the user is trying to quit the program
                     elif inp == "Q":
-                        # Quit
+                        
+                        # Prints exit message
                         print(bcolors.BOLD + bcolors.FAIL + "EXITING CLIENT PROGRAM." + bcolors.ENDC)
+                        
+                        # Exits terminal and closes socket
                         os.kill(os.getpid(), signal.SIGINT)
                         break
 
+                    # User submitted invalid message syntax
                     else:
+                        # Prints syntax warning message
                         print(bcolors.WARNING + "NEED TO SPECIFY USER. Correct usage: USER-> Message." + bcolors.ENDC)
+                
+                # User submitted valid message syntax
                 else:
+                    # Breaks input into recipient and message based on "->"
                     inputList = inp.split("->")
                     recipient = inputList[0]
                     message = inputList[1]
+
+                    # Creates a message object
                     message = Message(recipient, username, message)
                     message = message.encode()
-                    # print("MESSAGE-CS:",message)
-                    print("The client username: " + username + " is attempting to send this message to the server.")
-                    # print(message)
-                    #TODO Check for byte overflow 1024            
+
+                    # Sends message to server
                     client.send(message)
+
 
             
     # USER IS NOW AUTHENTICATED
-    # Open up client to send and receive messages from server
+    # Open up thread to send and receive messages from server
     receive_thread = threading.Thread(target=client_receive)
     receive_thread.start()
 
     send_thread = threading.Thread(target=client_send)
     send_thread.start()
 
+# If user exits with ^C it is caught here
 except KeyboardInterrupt:
     print(bcolors.BOLD + bcolors.FAIL + "EXITING CLIENT PROGRAM." + bcolors.ENDC)

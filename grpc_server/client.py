@@ -61,12 +61,12 @@ class Client:
             command = input("Type " + bcolors.BOLD + "C" + bcolors.ENDC + " to create an account. Type " + bcolors.BOLD + "L" + bcolors.ENDC + " to login in." )
             while (command != "C" and command != "L"):
                 print("please type a valid command.")
-                command = input("Type " + bcolors.BOLD + "C" + bcolors.ENDC + " to create an account. Type " + bcolors.BOLD + "L message" + bcolors.ENDC + " to login into message." )
+                command = input("Type " + bcolors.BOLD + "C" + bcolors.ENDC + " to create an account. Type " + bcolors.BOLD + "L" + bcolors.ENDC + " to login into username." )
             if command == "C":
                 # Create Account
                 # Attempt to create an account until our user account is logged in
                 while not self.account.loggedIn:
-                    print("username must be alphanumeric characters.\n(Type "+bcolors.BOLD+"!"+bcolors.ENDC+" to go back)")
+                    print("Username must be alphanumeric characters.\n(Type "+bcolors.BOLD+"!"+bcolors.ENDC+" to go back)")
                     username = input("Please enter a username:")
                     if username == "!":
                         break
@@ -119,7 +119,7 @@ class Client:
 
             # Only accept messages that are meant for the client (Broadcast filtering) 
             # or messages that are meant to be read by all users
-            if (message.recipient == self.account.message) or (message.recipient == "all"):
+            if (message.recipient == self.account.username) or (message.recipient == "all"):
                 print(bcolors.OKCYAN + "[" + message.sender + "] " + bcolors.ENDC + message.message)
 
     # List Accounts that exist on Server (actice and inactive)

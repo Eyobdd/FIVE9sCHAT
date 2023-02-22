@@ -89,17 +89,24 @@ class ChatServer(rpc.ChatServerServicer):
 
     def login(self, request: chat.Account, context):
         
+        # Check is username exists.
         if request.username not in self.accounts.keys():
             #Str that request.created = False -- so we will return back to client that the account was not created.
             return request
         elif self.accounts[request.username].loggedIn:
             # Don't login if user is already active on the server
             return request
+
+        # Else -- Username exists and is not already active on the sever
         else:
             active = chat.Account()
             active.username = request.username
+
+            # Set auth properties to True
             active.created = True
             active.loggedIn = True
+
+            # return valid authorized account back to client
             self.accounts[active.username].loggedIn = True
             return active
 
@@ -111,66 +118,70 @@ class ChatServer(rpc.ChatServerServicer):
        verification.message = "DELETED."
        return verification
 
+    # Important note: this function is called when the CLIENT sends a message 
+    # to the SERVER (not the other way around)
     def sendStr(self, request: chat.Str, context):
-        """
-        This method is called when a clients sends a Str to the server.
 
-        :param request:
-        :param context:
-        :return:
-        """
-        print("message is being sent from " + request.sender)
+        # Check if client is attempting to send to a User who does not exist.
         if request.recipient not in self.accounts.keys():
-            # attempting to send to a user who does not exist.
             error = chat.Str()
             error.sender = self.serverAcc.username
             error.recipient = request.sender
             error.message = "USER-DOES-NOT-EXIST."
-
             return error
-        # User exist -- but is not logged in.
+
+        # User exists -- but is not logged in.
         elif not self.accounts[request.recipient].loggedIn:
+
+            # Don't add message to chat history -- we need to add to queued message
             if not self.queuedMessages or not self.queuedMessages[request.recipient]:
+                # Create a list to store queued messages for user if they don't already have one
                 self.queuedMessages[request.recipient] = []
+            # Add message to queue
             self.queuedMessages[request.recipient].append(request)
 
+            # Notify client that message was queued for recipient
             success = chat.Str()
             success.sender = self.serverAcc.username
             success.recipient = request.sender
             success.message = "QUEUED-MESSAGE-SENT."
             return success
+
         # User exists and is logged in.
         else:
-            print(self.accounts[request.recipient].loggedIn)
-            print("[{}] {}".format(request.sender, request.message))
-            # Add it to the chat history
+            # Add the message to the chat history -- which will be streamed to the clients (broadcasted)
             self.chats.append(request)
+
+            # Return a message sent verification message to client
             success = chat.Str()
             success.sender = self.serverAcc.username
             success.recipient = request.sender
             success.message = "MESSAGE-SENT."
-            return success  # something needs to be returned required by protobuf language, we just return empty msg
-    
+            return success
+
+    # Sends queued messages all as one string (because proto doesn't support lists or arrays)
     def dequeue (self, request: chat.Account, context):
         allMessages = ''
-        print(request.username)
-        print(self.queuedMessages)
+
+        # Queued messages is empty -- return empty string
         if not self.queuedMessages:
-            print("queued messages is empty")
             empty = chat.Str()
             empty.sender = self.serverAcc.username
             empty.recipient = request.username
             empty.message = ''
             return empty
+        # List to store queued messages for user does not exist
         if not self.queuedMessages[request.username]:
-            print("We hit this line")
+
+            # So we create the list and return empty string (since no queued messages exist)
             self.queuedMessages[request.username] = []
             empty = chat.Str()
             empty.sender = self.serverAcc.username
             empty.recipient = request.username
             empty.message = ''
-            print("We returned empty because user was just created.")
             return empty
+        
+        # Queued messages exist -- we merge them off of "|" and return them as one message
         else:
             for message in self.queuedMessages[request.username]:
                 allMessages += "|" + "[" + message.sender + "] " + message.message
@@ -181,19 +192,21 @@ class ChatServer(rpc.ChatServerServicer):
             dequeued.message = allMessages
             return dequeued
 
-
 if __name__ == '__main__':
+    # Set port
     port = 12341 
 
     # Set the maximum number of client connections (workers) to 10.
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))  # create a gRPC server
-    rpc.add_ChatServerServicer_to_server(ChatServer(), server)  # register the server to gRPC
-    # gRPC basically manages all the threading and server responding logic, which is perfect!
-    print('Starting server. Listening...')
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))  
+
+    # Create and register the gRPC server
+    rpc.add_ChatServerServicer_to_server(ChatServer(), server)
+
+    # Start the server on our IP and Port.
     server.add_insecure_port('10.250.92.212:' + str(port))
     server.start()
-    # Server starts in background (in another thread) so keep waiting
-    # if we don't wait here the main thread will end, which will end all the child threads, and thus the threads
-    # from the server won't continue to work and stop the server
+
+    # Server starts in background (in another thread) so keep waiting -- because
+    # if we don't, then the main thread will end, ending the children threads
     while True:
         time.sleep(64 * 64 * 100)

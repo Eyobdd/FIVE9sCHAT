@@ -35,6 +35,26 @@ loginStatus['SERVER'] = True
 # Stores all messages to offline users {username: Message()}
 queuedMessages = {}
 
+
+# Function sends encoded message to username
+def sendToClient(username, message):
+
+    # Creates Message() object
+    message = Message(username, "SERVER", message)
+
+    # Finds socket associated with user
+    client = clientID[username]
+
+    # Sends encoded message to that user
+    client.send(message.encode())
+
+# Function receives data from client
+def receiveData(client):
+    data = client.recv(HEADER_LENGTH).decode('utf-8')
+    data_length = int(data.strip())
+    data = client.recv(data_length).decode('utf-8')
+    return data
+
 # Protocol action handles all actions by the server according to our Protocol
 # Input is either a Message() or Command() object
 def protocol_action(obj):
@@ -44,25 +64,32 @@ def protocol_action(obj):
 
         # If recipient exists -> sends error to client if they do not
         if obj.recipient not in loginStatus:
-            doesNotExist = "The user you are trying to contact does not exist."
-            doesNotExist = Message(obj.sender, "SERVER", doesNotExist)
-            sendToClient(obj.sender, doesNotExist.encode())
+            # doesNotExist = "The user you are trying to contact does not exist."
+            # doesNotExist = Message(obj.sender, "SERVER", doesNotExist)
+            # sendToClient(obj.sender, doesNotExist.encode())
+
+            sendToClient(obj.sender, "The user you are trying to contact does not exist.")
 
         # If recipient is logged-out -> Alerts sender and and queues the message
         elif not loginStatus[obj.recipient]:
-            notlogin = obj.recipient + " is not logged in. But your message will be delivered"
-            notlogin = Message(obj.sender, "SERVER", notlogin)
-            sendToClient(obj.sender,notlogin.encode())
+            # notlogin = obj.recipient + " is not logged in. But your message will be delivered"
+            # notlogin = Message(obj.sender, "SERVER", notlogin)
+            # sendToClient(obj.sender,notlogin.encode())
+
+            sendToClient(obj.sender, f"{obj.recipient} is not logged in. But your message will be delivered")
+
             if obj.recipient not in queuedMessages.keys():
                 queuedMessages[obj.recipient] = []
             queuedMessages[obj.recipient].append(obj)
 
         # Else sends the message to recipient and delivery confirmation to sender
         elif (clientID[obj.recipient] in clients):
-            success = "Your message has successfully delivered."
-            success = Message(obj.sender, "SERVER", success)
-            sendToClient(obj.recipient, obj.encode())
-            sendToClient(obj.sender, success.encode())
+            # success = "Your message has successfully delivered."
+            # success = Message(obj.sender, "SERVER", success)
+            # sendToClient(obj.recipient, obj.encode())
+            # sendToClient(obj.sender, success.encode())
+            clientID[obj.recipient].send(obj.encode())
+            sendToClient(obj.sender, "Your message has successfully delivered.")
     
     # If the object is a Command() then we execute the command
     if isinstance(obj, Command):
@@ -73,9 +100,10 @@ def protocol_action(obj):
             # User must be online execute this Command so no checks are needed
 
             # Send confirmation to user
-            success = "Account-Successfully-Deleted"
-            success = Message(obj.username, "SERVER", success)
-            sendToClient(obj.username, success.encode())
+            # success = "Account-Successfully-Deleted"
+            # success = Message(obj.username, "SERVER", success)
+            # sendToClient(obj.username, success.encode())
+            sendToClient(obj.username,"Account-Successfully-Deleted")
 
 
             # Remove user from loginStatus and clientID list
@@ -111,8 +139,9 @@ def protocol_action(obj):
                 allAccounts = allAccounts[:-1]
 
             # Sends list to client to display
-            allAccounts = Message(obj.username, "SERVER", allAccounts)
-            sendToClient(obj.username, allAccounts.encode())
+            # allAccounts = Message(obj.username, "SERVER", allAccounts)
+            # sendToClient(obj.username, allAccounts.encode())
+            sendToClient(obj.username, allAccounts)
 
 
 # Protocol unpack returns Message() and Command() from protocol buffers
@@ -120,7 +149,6 @@ def protocol_action(obj):
 def protocol_unpack(data,client):
 
     # Buffer data and splits on the colon 
-    data = data.decode('UTF-8')
     dataSplit = data.split(":",3)
 
     # Retrieves type of message/command from buffer data
@@ -160,20 +188,9 @@ def broadcast(message):
         # Finds username and creates a message object
         index = clients.index(client)
         username = usernames[index]
-        message = Message(username, "SERVER", message)
         
-        # Sends message to user
-        client.send(message.encode())
-
-# Function sends encoded message to username
-def sendToClient(username, message):
-
-    # Finds socket associated with user
-    client = clientID[username]
-
-    # Sends encoded message to that user
-    client.send(message)
-
+        # # Sends message to user
+        sendToClient(username,message)
 
 # Server thread to handle client <-> server communications
 def handle_client(client):
@@ -181,9 +198,7 @@ def handle_client(client):
     # Displays All accounts and statuses when the client connects
 
     # First message will be a request to list accounts
-    data = client.recv(HEADER_LENGTH).decode('utf-8')
-    data_length = int(data.strip())
-    data = client.recv(data_length)
+    data = receiveData(client)
 
     ## Generate account list
     allAccounts = 'LA|'
@@ -220,9 +235,7 @@ def handle_client(client):
     while not client_auth:
          
         # Recieve client Command -- Either type CA (Create Account) or L(Login)
-        data = client.recv(HEADER_LENGTH).decode('utf-8')
-        data_length = int(data.strip())
-        data = client.recv(data_length).decode('utf-8')
+        data = receiveData(client)
 
         # Split buffer data and extract the username and type that were sent   
         data = data.split(":",3)
@@ -248,10 +261,7 @@ def handle_client(client):
                 clientID[username] = client
                 loginStatus[username] = True
 
-                # Sends account creation confirmation
-                success = "Successful-Account-Creation."
-                success = Message(username, "SERVER", success)
-                client.send(success.encode())
+                sendToClient(username,"Successful-Account-Creation.")
 
                 # Broadcasts new connection and authenticates connection
                 onConnection(username)
@@ -282,9 +292,7 @@ def handle_client(client):
                 loginStatus[username] = True
 
                 # Send confirmation message
-                success = "Login-Successful."
-                success = Message(username, "SERVER", success)
-                client.send(success.encode())
+                sendToClient(username,"Login-Successful.")
 
                 # Broadcast connection and deliver messages and authenticate client
                 onConnection(username)
@@ -294,9 +302,8 @@ def handle_client(client):
     while True:
         try:
             # Receives bits from client and converts to buffer(encoded)
-            header = client.recv(HEADER_LENGTH).decode("utf-8").strip()
-            data_length = int(header)
-            data = client.recv(data_length)
+            
+            data = receiveData(client)
 
             # Applies wire protocol to buffer -> returns a Message() or Command() objects
             obj = protocol_unpack(data,client)
@@ -355,7 +362,7 @@ def onConnection(username):
     # Dequeuing of stored user messages
     if username in queuedMessages.keys():
         for message in queuedMessages[username][:]:
-            sendToClient(username, message.encode())
+            sendToClient(username, message.data)
             queuedMessages[username].remove(message)
 
 if __name__ == "__main__":

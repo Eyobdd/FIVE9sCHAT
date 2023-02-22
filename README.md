@@ -31,6 +31,7 @@ The application allows for the following features (**client side)**:
 **Requirements:**  Python 3 or 3+, grpcio==1.9.0, grpcio-tools==1.9.0, google-api-python-client, protobuf==3.18.3, six==1.11.0
 
 Open up terminal
+
 **First Clone this repository**
 
     git clone https://github.com/Eyobdd/FIVE9sCHAT.git

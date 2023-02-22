@@ -1,13 +1,11 @@
 ## TODO
 # 1. Write unit tests and say expected outputs -- Eyob
-# 2. Write setup documentation
-# IMPORTANT 3. Set up port forwarding (DONE FOR SOCKET) (TODO for GPRC)
+# 2. Write setup documentation (Aneesh)
 # 4. Comment code (Eyob on socket), (Aneesh on GRPC)
 # 5. Clean up code
 # 6. Write decision documentation (Eyob on Socket), (Aneesh on GRPC), (Aneesh on intro and design strategy)
-# 7. Add Go Back in the Create or Login window -> (Eyob on Socket), (TODO Aneesh on GRPC) (DONE FOR SOCKET)
-# 9. Create Uniform Error Code System
-# 10. Create decode abstraction. 
+# 9. Create Uniform Error Code System -- future
+# 10. Create decode abstraction.  -- if time
 
 
 

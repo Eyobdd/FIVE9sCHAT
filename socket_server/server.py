@@ -115,7 +115,7 @@ def protocol_action(obj):
             sendToClient(obj.username, allAccounts.encode())
 
 
-# Protocol unpack creates Message() and Command() from protocol buffers
+# Protocol unpack returns Message() and Command() from protocol buffers
 # Takes a client socket and encoded buffer data
 def protocol_unpack(data,client):
 
@@ -126,89 +126,120 @@ def protocol_unpack(data,client):
     # Retrieves type of message/command from buffer data
     type_ = dataSplit[0]
 
+    # If type is M -> create and return Message() object
     if type_ == "M":
+
+        # Return Message()
         return Message.createMessageFromBuffer(data)
+
+    # If type is LA -> create and return Command() object
     elif type_ == "LA":
+        
+        # Get username from buffer
         username = dataSplit[1]
 
-        #TODO Implement createCommandFromBuffer
-        # usage -> Command.createCommandFromBuffer(client, external_data, data)
+        # Return Command() with server login status information
         return Command.createCommandFromBuffer(client, loginStatus ,username,type_)
+
+    # If type is DA -> create and return Command() object
     elif type_ == "DA":
-        #TODO Implement createCommandFromBuffer
+
+        # Get username from buffer
         username = dataSplit[1]
+
+        # Return Command() 
         return Command.createCommandFromBuffer(client, None ,username,type_)
 
-                
+
+# Function sends a message to all active accounts 
 def broadcast(message):
+    
+    # Loops through all active users
     for client in clients:
+
+        # Finds username and creates a message object
         index = clients.index(client)
         username = usernames[index]
-
         message = Message(username, "SERVER", message)
         
+        # Sends message to user
         client.send(message.encode())
 
-# Function to handle clients'connections
+# Function sends encoded message to username
 def sendToClient(username, message):
 
+    # Finds socket associated with user
     client = clientID[username]
+
+    # Sends encoded message to that user
     client.send(message)
 
 
-
+# Server thread to handle client <-> server communications
 def handle_client(client):
-    # First message will be list accounts
+
+    # Displays All accounts and statuses when the client connects
+
+    # First message will be a request to list accounts
     data = client.recv(HEADER_LENGTH).decode('utf-8')
     data_length = int(data.strip())
     data = client.recv(data_length)
 
     ## Generate account list
-
-    # obj.data {username: loginstatus}
     allAccounts = 'LA|'
+
     for account in loginStatus:
-        #  username is active
+
+        # If username is active
         if loginStatus[account]:
             status = 'active'
-        # username is not active
+
+        # If username is inactive
         else:
             status = 'inactive'
+
+        # Add account status to list with "|", as a divider
         allAccounts += account + " ( " + status + " )" + "|"
+
+    # Remove the last "|" if accounts exists 
     if len(allAccounts) > len("LA|"):
         allAccounts = allAccounts[:-1]
     
+    # Sends List of all account statuses to client 
     message = f"M:_:SERVER:{allAccounts}".encode('utf-8')
     header = f"{len(message) :< {HEADER_LENGTH}}".encode('utf-8')
     client.send(header+message)
 
 
+    ## Account Register/Login Loop
+
+    # Client starts unauthorized
     client_auth = False
-    # Validation - conditions -> while not auth
+
+    # While user is not authorized attempt to authenticate
     while not client_auth:
          
+        # Recieve client Command -- Either type CA (Create Account) or L(Login)
         data = client.recv(HEADER_LENGTH).decode('utf-8')
-        # print("DATA 1:", data)
         data_length = int(data.strip())
-        # print("DATA Length is ", data_length)
         data = client.recv(data_length).decode('utf-8')
-        print("data is ", data)
-        
+
+        # Split buffer data and extract the username and type that were sent   
         data = data.split(":",3)
         type_ = data[0]
         username = data[1]
         
-        if type_ == "CA":
-            # Attempting to create account
-            
-            # print("We are trying to create an account for " + username)
-            # print("DATALIST:",data)
 
-            # User already exists
+        # If type is CA -> attempt to create an account with the username
+        if type_ == "CA":
+
+            # If username already exists -> Send client error
             if username in loginStatus:
                 success = "Username-Already-Exists."
                 success = Message(username, "SERVER", success)
                 client.send(success.encode())
+
+            # 
             else:
                 # Account is succesffuly created and logged in 
                 usernames.append(username)

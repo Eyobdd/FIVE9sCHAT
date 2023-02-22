@@ -42,7 +42,7 @@ class ChatServer(rpc.ChatServerServicer):  # inheriting here from the protobuf r
                 lastindex += 1
                 yield n
         self.accounts[request_iterator.username].loggedIn = False
-        
+
         print(request_iterator.username + " disconnected")
     
 
@@ -158,9 +158,8 @@ class ChatServer(rpc.ChatServerServicer):  # inheriting here from the protobuf r
             print("We returned empty because user was just created.")
             return empty
         else:
-            print("The user exists in queuedMessages")
             for message in self.queuedMessages[request.username]:
-                allMessages += "|" + "[From " + message.sender + "] " + message.message
+                allMessages += "|" + "[" + message.sender + "] " + message.message
             
             dequeued = chat.Note()
             dequeued.sender = self.serverAcc.username

@@ -163,7 +163,7 @@ class Client:
                 if messageVerification.message == "USER-DOES-NOT-EXIST.":
                     print(bcolors.OKCYAN + "[SERVER] " + bcolors.ENDC + "The user you are trying to contact does not exist.")
                 elif messageVerification.message == "QUEUED-MESSAGE-SENT.":
-                    print(bcolors.OKCYAN + "[SERVER] " + bcolors.ENDC + " is not logged in. But your message will be delivered")
+                    print(bcolors.OKCYAN + "[SERVER] " + bcolors.ENDC + n.recipient +" is not logged in. But your message will be delivered")
                 elif messageVerification.message == "MESSAGE-SENT.":
                     print(bcolors.OKCYAN + "[SERVER] " + bcolors.ENDC + "Your message has successfully delivered.")
                       # send the Note to the server

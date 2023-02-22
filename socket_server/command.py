@@ -45,5 +45,5 @@ class Command:
 
 
     @staticmethod
-    def createCommandFromBuffer(client, external_data, data, type_):
-        return Command(client, external_data ,data,type_)
+    def createCommandFromBuffer(client, data, username, type_):
+        return Command(client, data ,username,type_)

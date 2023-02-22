@@ -8,7 +8,7 @@ import grpc
 import chat_pb2 as chat
 import chat_pb2_grpc as rpc
 
-address = 'localhost'
+address = '10.250.92.212'
 port = 11912
 
 class bcolors:
@@ -65,7 +65,7 @@ class Client:
                 accVerification = self.conn.createAccount(acc)
                 if accVerification.created:
                     self.account = accVerification
-                    print(bcolors.OKGREEN + self.account.username + " has been successfully created and logged in." + bcolors.ENDC)
+                    print(bcolors.OKGREEN + "Successful-Account-Creation." + bcolors.ENDC)
                 else:
                     print(bcolors.FAIL + "Account creation failed. Make sure it's a user that doesn't already exist." + bcolors.ENDC)
         elif decision == "L":
@@ -128,8 +128,6 @@ class Client:
         """
         This method is called when user enters something into the textbox
         """
-        print("starting sending thread")
-
         while True:
             message = input(bcolors.BOLD +"COMMANDS" + bcolors.ENDC + ": " + bcolors.BOLD + "\n" +"LA" + bcolors.ENDC + " - List accounts. "+ bcolors.BOLD + "\n" + "USERNAME-> MESSAGE" + bcolors.ENDC+ " - Send USERNAME MESSAGE." + "\n" + bcolors.BOLD + "DA" + bcolors.ENDC + " - Delete your account."+"\n" + bcolors.BOLD + "Q" + bcolors.ENDC + " - Quit client program."+"\n")
             if message == "LA":
@@ -152,11 +150,11 @@ class Client:
                 n.recipient = recipient
                 messageVerification = self.conn.sendNote(n)
                 if messageVerification.message == "USER-DOES-NOT-EXIST.":
-                    print(bcolors.FAIL + bcolors.BOLD + recipient + bcolors.ENDC + bcolors.FAIL +" DOES NOT EXIST." + bcolors.ENDC)
+                    print(bcolors.OKCYAN + "[SERVER] " + bcolors.ENDC + "The user you are trying to contact does not exist.")
                 elif messageVerification.message == "QUEUED-MESSAGE-SENT.":
-                    print(bcolors.OKBLUE + recipient + " is not currently active, but the message will be delivered when they login."+ bcolors.ENDC)
+                    print(bcolors.OKCYAN + "[SERVER] " + bcolors.ENDC + " is not logged in. But your message will be delivered")
                 elif messageVerification.message == "MESSAGE-SENT.":
-                    print(bcolors.OKGREEN + "message to " + recipient + "sucessfuly delivered. "+ bcolors.ENDC)
+                    print(bcolors.OKCYAN + "[SERVER] " + bcolors.ENDC + "Your message has successfully delivered.")
                       # send the Note to the server
     def dequeue(self):
         allMessages = self.conn.dequeue(self.account)

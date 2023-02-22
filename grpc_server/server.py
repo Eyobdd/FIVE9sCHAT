@@ -42,6 +42,7 @@ class ChatServer(rpc.ChatServerServicer):  # inheriting here from the protobuf r
                 lastindex += 1
                 yield n
         self.accounts[request_iterator.username].loggedIn = False
+        
         print(request_iterator.username + " disconnected")
     
 

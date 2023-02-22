@@ -1,12 +1,11 @@
 ## TODO
 # 1. Write unit tests and say expected outputs -- Eyob
 # 2. Write setup documentation
-# IMPORTANT 3. Set up port forwarding
+# IMPORTANT 3. Set up port forwarding (DONE FOR SOCKET) (TODO for GPRC)
 # 4. Comment code (Eyob on socket), (Aneesh on GRPC)
 # 5. Clean up code
 # 6. Write decision documentation (Eyob on Socket), (Aneesh on GRPC), (Aneesh on intro and design strategy)
-# 7. Add Go Back in the Create or Login window -> (Eyob on Socket), (Aneesh on GRPC)
-# 8. Add Broadcast in GPRC
+# 7. Add Go Back in the Create or Login window -> (Eyob on Socket), (TODO Aneesh on GRPC) (DONE FOR SOCKET)
 # 9. Create Uniform Error Code System
 # 10. Create decode abstraction. 
 
@@ -37,7 +36,7 @@ def encoded_message(message):
 HEADER_LENGTH = 10
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client.connect(('10.250.52.110', 12340))
+client.connect(('10.250.92.212', 12340))
 auth = False
 username = ''
 
@@ -139,8 +138,6 @@ try:
                         print(bcolors.FAIL + data.data + bcolors.ENDC)
                     elif data.data == "Successful-Account-Creation.":
                         auth = True
-                        print("The username after authentication is", username)
-                        print("Hit enter to continue.")
                         print(bcolors.OKGREEN + data.data + bcolors.ENDC)
                     elif data.data == "Username-Already-Exists.":
                         print(bcolors.FAIL + data.data + bcolors.ENDC)
@@ -151,7 +148,7 @@ try:
                     elif data.data == "Account-Does-Not-Exist":
                         print(bcolors.FAIL + data.data + bcolors.ENDC)
                     else:
-                        print(bcolors.OKCYAN + "[" + data.sender + " BROADCAST] " + bcolors.ENDC + data.data)
+                        print(bcolors.OKCYAN + "[" + data.sender + "] " + bcolors.ENDC + data.data)
 
 
                 # TODO Print errors in red - check if message is an error

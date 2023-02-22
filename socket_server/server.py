@@ -4,38 +4,51 @@ import socket
 from message import Message
 from command import Command
 
+# Constants
 HEADER_LENGTH = 10
 HOST = '10.250.92.212'
 PORT = 12340
 
-
+# Connect sockets to server
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind((HOST, PORT))
 server.listen()
 
+# Information storage structures
 
+# Stores active socket
 clients = []
+
+# Stores active usernames
 usernames = [] 
+
+
+# Stores all active users {username:socket} pairs
 clientID = {}
 
+# Stores if a user is online or not all accounts {username:Boolean}
 loginStatus = {}
+
+# The server is always online so users cannot log into the server account
 loginStatus['SERVER'] = True
 
-queuedMessages = {} #[username:[Message(), Message(), Message()]
+# Stores all messages to offline users {username: Message()}
+queuedMessages = {}
 
-
-# TODO Login and Register will need to be in another earlier function
+# Protocol action handles all actions by the server according to our Protocol
+# Input is either a Message() or Command() object
 def protocol_action(obj):
 
+    # If the object is a Message() then we try to send the message
     if isinstance(obj, Message):
 
-        # we now know we are working with a message
+        # If recipient exists -> sends error to client if they do not
         if obj.recipient not in loginStatus:
             doesNotExist = "The user you are trying to contact does not exist."
             doesNotExist = Message(obj.sender, "SERVER", doesNotExist)
             sendToClient(obj.sender, doesNotExist.encode())
 
-        # Check if user is logged in
+        # If recipient is logged-out -> Alerts sender and and queues the message
         elif not loginStatus[obj.recipient]:
             notlogin = obj.recipient + " is not logged in. But your message will be delivered"
             notlogin = Message(obj.sender, "SERVER", notlogin)
@@ -44,62 +57,67 @@ def protocol_action(obj):
                 queuedMessages[obj.recipient] = []
             queuedMessages[obj.recipient].append(obj)
 
-        #If user is active
+        # Else sends the message to recipient and delivery confirmation to sender
         elif (clientID[obj.recipient] in clients):
             success = "Your message has successfully delivered."
             success = Message(obj.sender, "SERVER", success)
             sendToClient(obj.recipient, obj.encode())
             sendToClient(obj.sender, success.encode())
     
+    # If the object is a Command() then we execute the command
     if isinstance(obj, Command):
 
+        # If Command type is DA -> Delete Account
         if obj.actionType == "DA":
-            
-            # user doesn't exist? THIS MAY BE REDUNDANT CAUSE USER MUST EXIST TO MAKE CALL
-            if obj.username not in clientID:
-                failure = "Account-Does-Not-Exist"
-                failure = Message(obj.username,"SERVER",failure)
-                sendToClient(obj.username,failure.encode())
                 
-            # user exists
-            else:
-                
-                # Send confirmation to user
-                success = "Account-Successfully-Deleted"
-                success = Message(obj.username, "SERVER", success)
-                sendToClient(obj.username, success.encode())
+            # User must be online execute this Command so no checks are needed
 
-                # Close socket - note disconnection of socket will automatically remove user from clients and usernames
+            # Send confirmation to user
+            success = "Account-Successfully-Deleted"
+            success = Message(obj.username, "SERVER", success)
+            sendToClient(obj.username, success.encode())
 
-                # remove user from lists
-                del loginStatus[obj.username]
-                del clientID[obj.username]
 
-                # only delete from queued messages if user had queued messages. 
-                if obj.username in queuedMessages.keys():
-                    del queuedMessages[obj.username]
+            # Remove user from loginStatus and clientID list
+            del loginStatus[obj.username]
+            del clientID[obj.username]
 
-                
+            # Only delete from queued messages if user had queued messages. 
+            if obj.username in queuedMessages.keys():
+                del queuedMessages[obj.username]
+
+        # If Command type is LA -> Lists all stored accounts with their login status
         elif obj.actionType == "LA":
-            ## Generate account list
 
-            # obj.data {username: loginstatus}
+            ## Generate account list
             allAccounts = 'LA|'
+
+            # Append (active) or (inactive) to every username
             for account in obj.data:
-                #  username is active
+
+                #  If username is active
                 if obj.data[account]:
                     status = 'active'
-                # username is not active
+
+                # If username is not active
                 else:
                     status = 'inactive'
+                
+                # Add account status to list with "|", as a divider
                 allAccounts += account + " ( " + status + " )" + "|"
+
+            # Remove the last "|" if accounts exists 
             if len(allAccounts) > len("LA|"):
                 allAccounts = allAccounts[:-1]
+
+            # Sends list to client to display
             allAccounts = Message(obj.username, "SERVER", allAccounts)
             sendToClient(obj.username, allAccounts.encode())
 
 
+# Protocol unpack creates all  
 def protocol_unpack(data,client):
+
     data = data.decode('UTF-8')
     dataSplit = data.split(":",3)
     type_ = dataSplit[0]

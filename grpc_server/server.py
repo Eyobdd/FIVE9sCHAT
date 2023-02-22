@@ -198,6 +198,7 @@ class ChatServer(rpc.ChatServerServicer):
 
 if __name__ == '__main__':
     # Set port
+    HOST = '10.250.52.110'
     port = 12341 
 
     # Set the maximum number of client connections (workers) to 10.
@@ -207,7 +208,7 @@ if __name__ == '__main__':
     rpc.add_ChatServerServicer_to_server(ChatServer(), server)
 
     # Start the server on our IP and Port.
-    server.add_insecure_port('10.250.52.110:' + str(port))
+    server.add_insecure_port(HOST + ':' + str(port))
     server.start()
 
     # Server starts in background (in another thread) so keep waiting -- because

@@ -8,13 +8,14 @@
 # 10. Create decode abstraction.  -- if time
 
 
-
+# Import modules used
 import threading
 import socket
-from message import Message
 import os
 import signal
+from message import Message
 
+# Constants used in text styling
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -26,43 +27,58 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+# Creates an encoded bitstring from a message using our wire protocol
 def encoded_message(message):
     message = message.encode('utf-8')
     header = f"{len(message) :< {HEADER_LENGTH}}".encode('utf-8')
     return header+message
 
+# Defined header length throughout wire protocol
 HEADER_LENGTH = 10
 
+# Create a socket and connect to the server
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect(('10.250.92.212', 12340))
+
+
+# User initially starts unnamed and unauthenticated
 auth = False
 username = ''
 
-
 try:
 
-    # Get all existing accounts
+    ## Display all existing accounts
+
+    # Sends request to server for a list of all existing accounts
     message = f"LA:{username}"
     message = encoded_message(message)
     client.send(message)
 
+    # Retrieves list from server of all existing accounts
     header = client.recv(HEADER_LENGTH).decode('utf-8').strip()
     data_length = int(header)
     data = client.recv(data_length).decode('utf-8')
 
+    # Displays all accounts with their activity status
     allAccounts = data.split("|")[1:]
     print(bcolors.OKGREEN + "The server holds the following accounts." + bcolors.ENDC)
     for account in allAccounts:
         print(" -- > " + account)
     
+    
     goBack = True
     while goBack:
         
+        # Asks user if they would like to login or create an account
         command = input("Type " + bcolors.BOLD + "C" + bcolors.ENDC + " to create an account. Type " + bcolors.BOLD + "L" + bcolors.ENDC + " to login in." )
+        
+        # Reprompt if user gives invalid answer
         while command != "C" and command != "L":
             print("Please select either C or L\n")
             command = input("Type " + bcolors.BOLD + "C" + bcolors.ENDC + " to create an account. Type " + bcolors.BOLD + "L" + bcolors.ENDC + " to login in." )
 
+
+        # Create a large
         while not auth:
             print("Usernames must be alphanumeric characters.\n(Type "+bcolors.BOLD+"!"+bcolors.ENDC+" to go back)")
             username = input("Please enter a username:")

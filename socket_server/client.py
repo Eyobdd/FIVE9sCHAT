@@ -49,11 +49,6 @@ try:
 
     ## Display all existing accounts
 
-    # Sends request to server for a list of all existing accounts
-    message = f"LA:{username}"
-    message = encoded_message(message)
-    client.send(message)
-
     # Retrieves list from server of all existing accounts
     header = client.recv(HEADER_LENGTH).decode('utf-8').strip()
     data_length = int(header)

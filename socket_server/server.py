@@ -146,8 +146,10 @@ def protocol_action(obj):
 
 # Protocol unpack returns Message() and Command() from protocol buffers
 # Takes a client socket and encoded buffer data
-def protocol_unpack(data,client):
-
+def protocol_unpack(client):
+    # Receives bits from client and converts to buffer(encoded)
+    data = receiveData(client)
+   
     # Buffer data and splits on the colon 
     dataSplit = data.split(":",3)
 
@@ -196,9 +198,6 @@ def broadcast(message):
 def handle_client(client):
 
     # Displays All accounts and statuses when the client connects
-
-    # First message will be a request to list accounts
-    data = receiveData(client)
 
     ## Generate account list
     allAccounts = 'LA|'
@@ -301,12 +300,10 @@ def handle_client(client):
     # Receives buffers from client and applies wire protocol
     while True:
         try:
-            # Receives bits from client and converts to buffer(encoded)
             
-            data = receiveData(client)
 
             # Applies wire protocol to buffer -> returns a Message() or Command() objects
-            obj = protocol_unpack(data,client)
+            obj = protocol_unpack(client)
 
             # Applies an action to the object
             protocol_action(obj)
@@ -359,10 +356,16 @@ def onConnection(username):
     message = f'{username} has connected to the chat room'
     broadcast(message)
 
-    # Dequeuing of stored user messages
+    # Dequeing of stored user messages
     if username in queuedMessages.keys():
         for message in queuedMessages[username][:]:
-            sendToClient(username, message.data)
+
+            # Finds socket associated with user
+            client = clientID[username]
+
+            # Sends encoded message to that user
+            client.send(message.encode())
+
             queuedMessages[username].remove(message)
 
 if __name__ == "__main__":

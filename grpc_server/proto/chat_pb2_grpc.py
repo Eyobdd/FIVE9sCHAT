@@ -17,7 +17,7 @@ class ChatServerStub(object):
         self.ChatStream = channel.unary_stream(
                 '/grpc.ChatServer/ChatStream',
                 request_serializer=chat__pb2.Account.SerializeToString,
-                response_deserializer=chat__pb2.Note.FromString,
+                response_deserializer=chat__pb2.Str.FromString,
                 )
         self.createAccount = channel.unary_unary(
                 '/grpc.ChatServer/createAccount',
@@ -27,12 +27,12 @@ class ChatServerStub(object):
         self.deleteAccount = channel.unary_unary(
                 '/grpc.ChatServer/deleteAccount',
                 request_serializer=chat__pb2.Account.SerializeToString,
-                response_deserializer=chat__pb2.Note.FromString,
+                response_deserializer=chat__pb2.Str.FromString,
                 )
         self.listAccounts = channel.unary_unary(
                 '/grpc.ChatServer/listAccounts',
                 request_serializer=chat__pb2.Empty.SerializeToString,
-                response_deserializer=chat__pb2.Account.FromString,
+                response_deserializer=chat__pb2.Str.FromString,
                 )
         self.login = channel.unary_unary(
                 '/grpc.ChatServer/login',
@@ -41,13 +41,13 @@ class ChatServerStub(object):
                 )
         self.sendNote = channel.unary_unary(
                 '/grpc.ChatServer/sendNote',
-                request_serializer=chat__pb2.Note.SerializeToString,
-                response_deserializer=chat__pb2.Note.FromString,
+                request_serializer=chat__pb2.Str.SerializeToString,
+                response_deserializer=chat__pb2.Str.FromString,
                 )
         self.dequeue = channel.unary_unary(
                 '/grpc.ChatServer/dequeue',
                 request_serializer=chat__pb2.Account.SerializeToString,
-                response_deserializer=chat__pb2.Note.FromString,
+                response_deserializer=chat__pb2.Str.FromString,
                 )
 
 
@@ -103,7 +103,7 @@ def add_ChatServerServicer_to_server(servicer, server):
             'ChatStream': grpc.unary_stream_rpc_method_handler(
                     servicer.ChatStream,
                     request_deserializer=chat__pb2.Account.FromString,
-                    response_serializer=chat__pb2.Note.SerializeToString,
+                    response_serializer=chat__pb2.Str.SerializeToString,
             ),
             'createAccount': grpc.unary_unary_rpc_method_handler(
                     servicer.createAccount,
@@ -113,12 +113,12 @@ def add_ChatServerServicer_to_server(servicer, server):
             'deleteAccount': grpc.unary_unary_rpc_method_handler(
                     servicer.deleteAccount,
                     request_deserializer=chat__pb2.Account.FromString,
-                    response_serializer=chat__pb2.Note.SerializeToString,
+                    response_serializer=chat__pb2.Str.SerializeToString,
             ),
             'listAccounts': grpc.unary_unary_rpc_method_handler(
                     servicer.listAccounts,
                     request_deserializer=chat__pb2.Empty.FromString,
-                    response_serializer=chat__pb2.Account.SerializeToString,
+                    response_serializer=chat__pb2.Str.SerializeToString,
             ),
             'login': grpc.unary_unary_rpc_method_handler(
                     servicer.login,
@@ -127,13 +127,13 @@ def add_ChatServerServicer_to_server(servicer, server):
             ),
             'sendNote': grpc.unary_unary_rpc_method_handler(
                     servicer.sendNote,
-                    request_deserializer=chat__pb2.Note.FromString,
-                    response_serializer=chat__pb2.Note.SerializeToString,
+                    request_deserializer=chat__pb2.Str.FromString,
+                    response_serializer=chat__pb2.Str.SerializeToString,
             ),
             'dequeue': grpc.unary_unary_rpc_method_handler(
                     servicer.dequeue,
                     request_deserializer=chat__pb2.Account.FromString,
-                    response_serializer=chat__pb2.Note.SerializeToString,
+                    response_serializer=chat__pb2.Str.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -158,7 +158,7 @@ class ChatServer(object):
             metadata=None):
         return grpc.experimental.unary_stream(request, target, '/grpc.ChatServer/ChatStream',
             chat__pb2.Account.SerializeToString,
-            chat__pb2.Note.FromString,
+            chat__pb2.Str.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -192,7 +192,7 @@ class ChatServer(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/grpc.ChatServer/deleteAccount',
             chat__pb2.Account.SerializeToString,
-            chat__pb2.Note.FromString,
+            chat__pb2.Str.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -209,7 +209,7 @@ class ChatServer(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/grpc.ChatServer/listAccounts',
             chat__pb2.Empty.SerializeToString,
-            chat__pb2.Account.FromString,
+            chat__pb2.Str.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -242,8 +242,8 @@ class ChatServer(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/grpc.ChatServer/sendNote',
-            chat__pb2.Note.SerializeToString,
-            chat__pb2.Note.FromString,
+            chat__pb2.Str.SerializeToString,
+            chat__pb2.Str.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -260,6 +260,6 @@ class ChatServer(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/grpc.ChatServer/dequeue',
             chat__pb2.Account.SerializeToString,
-            chat__pb2.Note.FromString,
+            chat__pb2.Str.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

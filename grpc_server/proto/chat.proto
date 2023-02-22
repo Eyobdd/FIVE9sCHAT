@@ -23,6 +23,6 @@ service ChatServer {
     rpc deleteAccount (Account) returns (Str);
     rpc listAccounts (Empty) returns (Str);
     rpc login(Account) returns (Account);
-    rpc sendNote (Str) returns (Str); 
+    rpc sendStr (Str) returns (Str); 
     rpc dequeue (Account) returns (Str);
 }

@@ -13,7 +13,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nchat.proto\x12\x04grpc\"\x07\n\x05\x45mpty\":\n\x04Note\x12\x0e\n\x06sender\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\x11\n\trecipient\x18\x03 \x01(\t\">\n\x07\x41\x63\x63ount\x12\x10\n\x08username\x18\x01 \x01(\t\x12\x0f\n\x07\x63reated\x18\x02 \x01(\x08\x12\x10\n\x08loggedIn\x18\x03 \x01(\x08\x32\xaf\x02\n\nChatServer\x12)\n\nChatStream\x12\r.grpc.Account\x1a\n.grpc.Note0\x01\x12-\n\rcreateAccount\x12\r.grpc.Account\x1a\r.grpc.Account\x12*\n\rdeleteAccount\x12\r.grpc.Account\x1a\n.grpc.Note\x12*\n\x0clistAccounts\x12\x0b.grpc.Empty\x1a\r.grpc.Account\x12%\n\x05login\x12\r.grpc.Account\x1a\r.grpc.Account\x12\"\n\x08sendNote\x12\n.grpc.Note\x1a\n.grpc.Note\x12$\n\x07\x64\x65queue\x12\r.grpc.Account\x1a\n.grpc.Noteb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nchat.proto\x12\x04grpc\"\x07\n\x05\x45mpty\"9\n\x03Str\x12\x0e\n\x06sender\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\x11\n\trecipient\x18\x03 \x01(\t\">\n\x07\x41\x63\x63ount\x12\x10\n\x08username\x18\x01 \x01(\t\x12\x0f\n\x07\x63reated\x18\x02 \x01(\x08\x12\x10\n\x08loggedIn\x18\x03 \x01(\x08\x32\xa6\x02\n\nChatServer\x12(\n\nChatStream\x12\r.grpc.Account\x1a\t.grpc.Str0\x01\x12-\n\rcreateAccount\x12\r.grpc.Account\x1a\r.grpc.Account\x12)\n\rdeleteAccount\x12\r.grpc.Account\x1a\t.grpc.Str\x12&\n\x0clistAccounts\x12\x0b.grpc.Empty\x1a\t.grpc.Str\x12%\n\x05login\x12\r.grpc.Account\x1a\r.grpc.Account\x12 \n\x08sendNote\x12\t.grpc.Str\x1a\t.grpc.Str\x12#\n\x07\x64\x65queue\x12\r.grpc.Account\x1a\t.grpc.Strb\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'chat_pb2', globals())
@@ -22,10 +22,10 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   DESCRIPTOR._options = None
   _EMPTY._serialized_start=20
   _EMPTY._serialized_end=27
-  _NOTE._serialized_start=29
-  _NOTE._serialized_end=87
-  _ACCOUNT._serialized_start=89
-  _ACCOUNT._serialized_end=151
-  _CHATSERVER._serialized_start=154
-  _CHATSERVER._serialized_end=457
+  _STR._serialized_start=29
+  _STR._serialized_end=86
+  _ACCOUNT._serialized_start=88
+  _ACCOUNT._serialized_end=150
+  _CHATSERVER._serialized_start=153
+  _CHATSERVER._serialized_end=447
 # @@protoc_insertion_point(module_scope)

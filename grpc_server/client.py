@@ -10,7 +10,7 @@ import chat_pb2_grpc as rpc
 
 #  Host and Port of our server to connect to 
 address = '10.250.92.212'
-port = 12340
+port = 12341
 
 # Colors to print on the terminal
 class bcolors:
@@ -66,12 +66,12 @@ class Client:
                 # Create Account
                 # Attempt to create an account until our user account is logged in
                 while not self.account.loggedIn:
-                    print("messages must be alphanumeric characters.\n(Type "+bcolors.BOLD+"!"+bcolors.ENDC+" to go back)")
-                    message = input("Please enter a message:")
-                    if message == "!":
+                    print("username must be alphanumeric characters.\n(Type "+bcolors.BOLD+"!"+bcolors.ENDC+" to go back)")
+                    username = input("Please enter a username:")
+                    if username == "!":
                         break
                     acc = chat.Account()
-                    acc.message = message
+                    acc.username = username
                     acc.created = False
                     acc.loggedIn = False
 
@@ -90,13 +90,13 @@ class Client:
                 # Attempt to create an account until our user account is logged in
 
                     while not self.account.loggedIn:
-                        print("messages must be alphanumeric characters.\n(Type "+bcolors.BOLD+"!"+bcolors.ENDC+" to go back)")
-                        message = input("What message would you like to Log into?\n")
-                        if message == "!":
+                        print("username must be alphanumeric characters.\n(Type "+bcolors.BOLD+"!"+bcolors.ENDC+" to go back)")
+                        username = input("What username would you like to Log into?\n")
+                        if username == "!":
                             break
 
                         acc = chat.Account()
-                        acc.message = message
+                        acc.username = username
                         acc.created = False
                         acc.loggedIn = False
 
@@ -163,7 +163,7 @@ class Client:
     # Thread that takes care of client input (to send to Server)
     def client_send(self):
         while True:
-            inp = input(bcolors.BOLD +"COMMANDS" + bcolors.ENDC + ": " + bcolors.BOLD + "\n" +"LA" + bcolors.ENDC + " - List accounts. "+ bcolors.BOLD + "\n" + "message-> message" + bcolors.ENDC+ " - Send message message." + "\n" + bcolors.BOLD + "DA" + bcolors.ENDC + " - Delete your account."+"\n" + bcolors.BOLD + "Q" + bcolors.ENDC + " - Quit client program."+"\n")
+            inp = input(bcolors.BOLD +"COMMANDS" + bcolors.ENDC + ": " + bcolors.BOLD + "\n" +"LA" + bcolors.ENDC + " - List accounts. "+ bcolors.BOLD + "\n" + "USERNAME-> MESSAGE" + bcolors.ENDC+ " - Send USERNAME MESSAGE." + "\n" + bcolors.BOLD + "DA" + bcolors.ENDC + " - Delete your account."+"\n" + bcolors.BOLD + "Q" + bcolors.ENDC + " - Quit client program."+"\n")
 
             # Command to list accounts
             if inp == "LA":
@@ -176,9 +176,9 @@ class Client:
                 os.kill(os.getpid(), signal.SIGINT)  
             
             # Illegal (message) command(s)  
-            elif "->" not in message:
+            elif "->" not in inp:
                 print(bcolors.WARNING + "NEED TO SPECIFY USER. Correct usage: USER-> message." + bcolors.ENDC)
-            elif "|" in message:
+            elif "|" in inp:
                 print(bcolors.WARNING + "Unfortunately, we do not support | as a character in our chat." + bcolors.ENDC)
             else:
                 # Get who the message should be sent to and the contents of the message      
@@ -187,17 +187,17 @@ class Client:
 
                 # From the recipient and message contents, construct a proto message
                 n = chat.Str()
-                n.sender = self.account.message  
+                n.sender = self.account.username  
                 n.message = message
                 n.recipient = recipient
 
                 # Send the message to the server and recieve a verification message
-                messageVerification = self.conn.sendmessage(n)
+                messageVerification = self.conn.sendStr(n)
                 if messageVerification.message == "USER-DOES-NOT-EXIST.":
                     print(bcolors.OKCYAN + "[SERVER] " + bcolors.ENDC + "The user you are trying to contact does not exist.")
-                elif messageVerification.message == "QUEUED-message-SENT.":
+                elif messageVerification.message == "QUEUED-MESSAGE-SENT.":
                     print(bcolors.OKCYAN + "[SERVER] " + bcolors.ENDC + n.recipient +" is not logged in. But your message will be delivered")
-                elif messageVerification.message == "message-SENT.":
+                elif messageVerification.message == "MESSAGE-SENT.":
                     print(bcolors.OKCYAN + "[SERVER] " + bcolors.ENDC + "Your message has successfully delivered.")
 
     # Called when user is first logged in -- goal is to retrieve queued messages from server

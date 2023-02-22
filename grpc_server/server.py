@@ -82,7 +82,7 @@ class ChatServer(rpc.ChatServerServicer):
 
         # Return all of the accounts as the username of the account. 
         allAccounts = chat.Str()
-        allAccounts.username = self.serverAcc.username
+        allAccounts.sender = self.serverAcc.username
         allAccounts.recipient = 'unauthenticated user'
         allAccounts.message = accountString
         return allAccounts
@@ -183,14 +183,14 @@ class ChatServer(rpc.ChatServerServicer):
 
 
 if __name__ == '__main__':
-    port = 12340  
+    port = 12341 
 
     # Set the maximum number of client connections (workers) to 10.
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))  # create a gRPC server
     rpc.add_ChatServerServicer_to_server(ChatServer(), server)  # register the server to gRPC
     # gRPC basically manages all the threading and server responding logic, which is perfect!
     print('Starting server. Listening...')
-    server.add_insecure_port('[::]:' + str(port))
+    server.add_insecure_port('10.250.92.212:' + str(port))
     server.start()
     # Server starts in background (in another thread) so keep waiting
     # if we don't wait here the main thread will end, which will end all the child threads, and thus the threads

@@ -66,6 +66,7 @@ try:
         print(" -- > " + account)
     
     
+    # goBack loop lets user reselect if they want to login or create an account
     goBack = True
     while goBack:
         
@@ -78,33 +79,51 @@ try:
             command = input("Type " + bcolors.BOLD + "C" + bcolors.ENDC + " to create an account. Type " + bcolors.BOLD + "L" + bcolors.ENDC + " to login in." )
 
 
-        # Create a large
+        # Authentication loop only broken if user goes back or is authenticated
         while not auth:
+
+            # Asks for username and gives option to go back 
             print("Usernames must be alphanumeric characters.\n(Type "+bcolors.BOLD+"!"+bcolors.ENDC+" to go back)")
             username = input("Please enter a username:")
-            # print("line 38")
 
+            # If user wants to create an account and submits a real username
             if command == "C" and username != "!":
-                # print("line 40")
+                
+                # Sends Create account request to server
                 request_message = f"CA:{username}"
                 request_message = encoded_message(request_message)
                 client.send(request_message)
 
+                # Awaits and receives server confirmation
                 header = client.recv(HEADER_LENGTH).decode('utf-8')
                 confirmation_length = int(header.strip())
                 confirmation = client.recv(confirmation_length).decode('utf-8')
                 
+                # Takes the confirmation message only
                 confirmation = confirmation.split(":",3)[3]
                 
+                # Checks if request is successful
                 if confirmation == "Successful-Account-Creation.":
+                    
+                    # User is authorized
                     auth = True
                     goBack = False
+                    
+                    # Print confirmation message
                     print(bcolors.OKGREEN + confirmation + bcolors.ENDC)
+
                 else:
+
+                    # Reset username
                     username = ''
+                    
+                    # Print confirmation message
                     print(bcolors.FAIL + confirmation + bcolors.ENDC)
 
+            # If user submits a real
             elif username != "!":
+                
+                # User 
                 request_message = f"L:{username}"
                 request_message = encoded_message(request_message)
                 client.send(request_message)

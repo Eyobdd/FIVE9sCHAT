@@ -45,8 +45,5 @@ class Command:
 
 
     @staticmethod
-    def registerAccount(socket, is_taken,username):
-        if is_taken:
-            return sendConfirmation(socket,"Username is already taken!")
-        sendConfirmation(socket,"Account has been created!")
-        return Account(socket, username)
+    def createCommandFromBuffer(client, external_data, data, type_):
+        return Command(client, external_data ,data,type_)

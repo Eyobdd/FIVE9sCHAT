@@ -115,30 +115,30 @@ def protocol_action(obj):
             sendToClient(obj.username, allAccounts.encode())
 
 
-# Protocol unpack creates all  
+# Protocol unpack creates Message() and Command() from protocol buffers
+# Takes a client socket and encoded buffer data
 def protocol_unpack(data,client):
 
+    # Buffer data and splits on the colon 
     data = data.decode('UTF-8')
     dataSplit = data.split(":",3)
+
+    # Retrieves type of message/command from buffer data
     type_ = dataSplit[0]
-    print("UNPACK-TYPE:",type_)
-    match type_:
 
-        case "M":
-            return Message.createMessageFromBuffer(data)
-        
-        case "LA":
-            username = dataSplit[1]
+    if type_ == "M":
+        return Message.createMessageFromBuffer(data)
+    elif type_ == "LA":
+        username = dataSplit[1]
 
-            #TODO Implement createCommandFromBuffer
-            # usage -> Command.createCommandFromBuffer(client, external_data, data)
-            return Command(client, loginStatus, username, type_)
+        #TODO Implement createCommandFromBuffer
+        # usage -> Command.createCommandFromBuffer(client, external_data, data)
+        return Command.createCommandFromBuffer(client, loginStatus ,username,type_)
+    elif type_ == "DA":
+        #TODO Implement createCommandFromBuffer
+        username = dataSplit[1]
+        return Command.createCommandFromBuffer(client, None ,username,type_)
 
-        case "DA":
-
-            #TODO Implement createCommandFromBuffer
-            username = dataSplit[1]
-            return Command(client, None ,username,type_)
                 
 def broadcast(message):
     for client in clients:

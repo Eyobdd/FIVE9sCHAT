@@ -49,39 +49,50 @@ class Client:
 
 
     def authenticate(self):
-        print(bcolors.OKGREEN + "Would you like to CREATE an account or LOGIN to an existing user from above? " + bcolors.ENDC)
-        decision = input("Type " + bcolors.BOLD + "C" + bcolors.ENDC + " to create an account. Type " + bcolors.BOLD + "L" + bcolors.ENDC + " to login in." )
-        while (decision != "C" and decision != "L"):
-            print("please type a valid decision.")
-            decision = input("Type " + bcolors.BOLD + "C" + bcolors.ENDC + " to create an account. Type " + bcolors.BOLD + "L USERNAME" + bcolors.ENDC + " to login into USERNAME." )
-        if decision == "C":
-            # Create Account
-            while not self.account.loggedIn:
-                message = input("What username would you like to create?\n")
-                acc = chat.Account()
-                acc.username = message
-                acc.created = False
-                acc.loggedIn = False
-                accVerification = self.conn.createAccount(acc)
-                if accVerification.created:
-                    self.account = accVerification
-                    print(bcolors.OKGREEN + "Successful-Account-Creation." + bcolors.ENDC)
-                else:
-                    print(bcolors.FAIL + "Account creation failed. Make sure it's a user that doesn't already exist." + bcolors.ENDC)
-        elif decision == "L":
-            # Attempt to Login
+
+        goBack = True
+        while goBack:
+            print(bcolors.OKGREEN + "Would you like to CREATE an account or LOGIN to an existing user from above? " + bcolors.ENDC)
+            command = input("Type " + bcolors.BOLD + "C" + bcolors.ENDC + " to create an account. Type " + bcolors.BOLD + "L" + bcolors.ENDC + " to login in." )
+            while (command != "C" and command != "L"):
+                print("please type a valid command.")
+                command = input("Type " + bcolors.BOLD + "C" + bcolors.ENDC + " to create an account. Type " + bcolors.BOLD + "L USERNAME" + bcolors.ENDC + " to login into USERNAME." )
+            if command == "C":
+                # Create Account
                 while not self.account.loggedIn:
-                    message = input("What username would you like to Log into?\n")
+                    print("Usernames must be alphanumeric characters.\n(Type "+bcolors.BOLD+"!"+bcolors.ENDC+" to go back)")
+                    message = input("Please enter a username:")
+                    if message == "!":
+                        break
                     acc = chat.Account()
                     acc.username = message
                     acc.created = False
                     acc.loggedIn = False
-                    accVerification = self.conn.login(acc)
+                    accVerification = self.conn.createAccount(acc)
                     if accVerification.created:
                         self.account = accVerification
-                        print(bcolors.OKGREEN + "Login-Successful." + bcolors.ENDC)
+                        goBack = False
+                        print(bcolors.OKGREEN + "Successful-Account-Creation." + bcolors.ENDC)
                     else:
-                        print(bcolors.FAIL + "Login failed. Make sure user exists and/or that user isn't already logged in (active)" + bcolors.ENDC)
+                        print(bcolors.FAIL + "Account creation failed. Make sure it's a user that doesn't already exist." + bcolors.ENDC)
+            elif command == "L":
+                # Attempt to Login
+                    while not self.account.loggedIn:
+                        print("Usernames must be alphanumeric characters.\n(Type "+bcolors.BOLD+"!"+bcolors.ENDC+" to go back)")
+                        message = input("What username would you like to Log into?\n")
+                        if message == "!":
+                            break
+                        acc = chat.Account()
+                        acc.username = message
+                        acc.created = False
+                        acc.loggedIn = False
+                        accVerification = self.conn.login(acc)
+                        if accVerification.created:
+                            self.account = accVerification
+                            print(bcolors.OKGREEN + "Login-Successful." + bcolors.ENDC)
+                            goBack = False
+                        else:
+                            print(bcolors.FAIL + "Login failed. Make sure user exists and/or that user isn't already logged in (active)" + bcolors.ENDC)
 
 
     def __listen_for_messages(self):

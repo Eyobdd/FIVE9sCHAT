@@ -10,6 +10,8 @@ import chat_pb2_grpc as rpc
 class ChatServer(rpc.ChatServerServicer): 
 
     def __init__(self):
+
+        print("Server has started.")
         # Keep track of server-wide chat history
         self.chats = []
         
@@ -122,6 +124,7 @@ class ChatServer(rpc.ChatServerServicer):
     # to the SERVER (not the other way around)
     def sendStr(self, request: chat.Str, context):
 
+        print("sendStr called from ", request.sender)
         # Check if client is attempting to send to a User who does not exist.
         if request.recipient not in self.accounts.keys():
             error = chat.Str()
@@ -132,9 +135,10 @@ class ChatServer(rpc.ChatServerServicer):
 
         # User exists -- but is not logged in.
         elif not self.accounts[request.recipient].loggedIn:
-
+            
             # Don't add message to chat history -- we need to add to queued message
-            if not self.queuedMessages or not self.queuedMessages[request.recipient]:
+
+            if request.recipient not in self.queuedMessages.keys():
                 # Create a list to store queued messages for user if they don't already have one
                 self.queuedMessages[request.recipient] = []
             # Add message to queue
@@ -158,7 +162,7 @@ class ChatServer(rpc.ChatServerServicer):
             success.recipient = request.sender
             success.message = "MESSAGE-SENT."
             return success
-
+        
     # Sends queued messages all as one string (because proto doesn't support lists or arrays)
     def dequeue (self, request: chat.Account, context):
         allMessages = ''
@@ -203,7 +207,7 @@ if __name__ == '__main__':
     rpc.add_ChatServerServicer_to_server(ChatServer(), server)
 
     # Start the server on our IP and Port.
-    server.add_insecure_port('10.250.92.212:' + str(port))
+    server.add_insecure_port('10.250.52.110:' + str(port))
     server.start()
 
     # Server starts in background (in another thread) so keep waiting -- because

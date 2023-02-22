@@ -9,7 +9,7 @@ import chat_pb2 as chat
 import chat_pb2_grpc as rpc
 
 #  Host and Port of our server to connect to 
-address = '10.250.92.212'
+address = '10.250.52.110'
 port = 12341
 
 # Colors to print on the terminal
@@ -206,7 +206,7 @@ class Client:
         if allmessages.message == '':
             return
         else:
-
+            print("Messages you haven't seen yet: ")
             # Like listAccounts, messages are merged -- we need to split on "|"
             allmessages = allmessages.message.split("|")
             for message in allmessages:

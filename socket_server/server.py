@@ -1,45 +1,40 @@
 import threading
 import socket
-import random
+
 from message import Message
 from command import Command
+
 HEADER_LENGTH = 10
+HOST = '10.250.92.212'
+PORT = 12340
 
 
-host = '127.0.0.1'
-port = 12340
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.bind((host, port))
+server.bind((HOST, PORT))
 server.listen()
-clientDict = {} # [username: Account(), username: Account()]
-clients = [] #live users [client_socket, client_socket]
+
+
+clients = []
 usernames = [] 
-clientID = {} # Now: [username: client_socket] Future -> [userID: User(), userID: User()]
+clientID = {}
 
-
-#Class User
-# client
-# queuedMessages [Message()]
-# deque --> 
-
-loginStatus = {} #[username: T or F]
-#[A: T, B: F, C: F, D: T]
-#Send User X
+loginStatus = {}
+loginStatus['SERVER'] = True
 
 queuedMessages = {} #[username:[Message(), Message(), Message()]
 
 
 # TODO Login and Register will need to be in another earlier function
 def protocol_action(obj):
-    print("our object is of instance ")
-    print(obj)
-    print(type(obj))
+
     if isinstance(obj, Message):
+
         # we now know we are working with a message
         if obj.recipient not in loginStatus:
             doesNotExist = "The user you are trying to contact does not exist."
             doesNotExist = Message(obj.sender, "SERVER", doesNotExist)
             sendToClient(obj.sender, doesNotExist.encode())
+
         # Check if user is logged in
         elif not loginStatus[obj.recipient]:
             notlogin = obj.recipient + " is not logged in. But your message will be delivered"
@@ -48,6 +43,7 @@ def protocol_action(obj):
             if obj.recipient not in queuedMessages.keys():
                 queuedMessages[obj.recipient] = []
             queuedMessages[obj.recipient].append(obj)
+
         #If user is active
         elif (clientID[obj.recipient] in clients):
             success = "Your message has successfully delivered."
@@ -76,10 +72,8 @@ def protocol_action(obj):
                 # Close socket - note disconnection of socket will automatically remove user from clients and usernames
 
                 # remove user from lists
-                print("loginstatus before deleting", loginStatus)
                 del loginStatus[obj.username]
                 del clientID[obj.username]
-                print("loginstatus after deleting", loginStatus)
 
                 # only delete from queued messages if user had queued messages. 
                 if obj.username in queuedMessages.keys():
@@ -91,8 +85,6 @@ def protocol_action(obj):
 
             # obj.data {username: loginstatus}
             allAccounts = 'LA|'
-            print("OBJECT DATA:", obj.data)
-            print("LOGIN STATUS:", loginStatus)
             for account in obj.data:
                 #  username is active
                 if obj.data[account]:
@@ -109,7 +101,7 @@ def protocol_action(obj):
 
 def protocol_unpack(data,client):
     data = data.decode('UTF-8')
-    dataSplit = data.split(":")
+    dataSplit = data.split(":",3)
     type_ = dataSplit[0]
     print("UNPACK-TYPE:",type_)
     match type_:
@@ -141,21 +133,38 @@ def broadcast(message):
 
 # Function to handle clients'connections
 def sendToClient(username, message):
-    
+
     client = clientID[username]
     client.send(message)
 
 
-# def unPackMessage(data):
-#     decodedM = data.decode('UTF-8').split("->")
-#     sender = decodedM[0]
-#     recipient = decodedM[1].strip()
-#     recipient = recipient.encode('UTF-8')
-#     message = (sender + " says -> " + decodedM[2]).encode('UTF-8')
-#     return recipient, message
-
 
 def handle_client(client):
+    # First message will be list accounts
+    data = client.recv(HEADER_LENGTH).decode('utf-8')
+    data_length = int(data.strip())
+    data = client.recv(data_length)
+
+    ## Generate account list
+
+    # obj.data {username: loginstatus}
+    allAccounts = 'LA|'
+    for account in loginStatus:
+        #  username is active
+        if loginStatus[account]:
+            status = 'active'
+        # username is not active
+        else:
+            status = 'inactive'
+        allAccounts += account + " ( " + status + " )" + "|"
+    if len(allAccounts) > len("LA|"):
+        allAccounts = allAccounts[:-1]
+    
+    message = f"M:_:SERVER:{allAccounts}".encode('utf-8')
+    header = f"{len(message) :< {HEADER_LENGTH}}".encode('utf-8')
+    client.send(header+message)
+
+
     client_auth = False
     # Validation - conditions -> while not auth
     while not client_auth:
@@ -167,7 +176,7 @@ def handle_client(client):
         data = client.recv(data_length).decode('utf-8')
         print("data is ", data)
         
-        data = data.split(":")
+        data = data.split(":",3)
         type_ = data[0]
         username = data[1]
         

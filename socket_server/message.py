@@ -15,7 +15,7 @@ class Message:
     @staticmethod
     def createMessageFromBuffer(header):
         #break down raw packet and construct message
-        header = header.split(":")
+        header = header.split(":",3)
         sender = header[1]
         recipient = header[2]
         data = header[3]

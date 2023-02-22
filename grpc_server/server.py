@@ -16,11 +16,11 @@ class ChatServer(rpc.ChatServerServicer):  # inheriting here from the protobuf r
         # List keeping track of all of the accounts
         self.accounts = {}
         self.serverAcc = chat.Account()
-        self.serverAcc.username = 'SERVER-ADMIN'
+        self.serverAcc.username = 'SERVER'
         self.serverAcc.created = True
         self.serverAcc.loggedIn = True
         self.queuedMessages = {}
-        self.accounts['SERVER-ADMIN'] = self.serverAcc
+        self.accounts['SERVER'] = self.serverAcc
 
 
     # The stream which will be used to send new messages to clients

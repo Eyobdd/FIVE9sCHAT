@@ -8,6 +8,7 @@
 # 7. Add Go Back in the Create or Login window -> (Eyob on Socket), (Aneesh on GRPC)
 # 8. Add Broadcast in GPRC
 # 9. Create Uniform Error Code System
+# 10. Create decode abstraction. 
 
 
 
@@ -16,13 +17,6 @@ import socket
 from message import Message
 import os
 import signal
-import errno
-HEADER_LENGTH = 10
-
-client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client.connect(('127.0.0.1', 12340))
-auth = False
-username = ''
 
 class bcolors:
     HEADER = '\033[95m'
@@ -40,78 +34,85 @@ def encoded_message(message):
     header = f"{len(message) :< {HEADER_LENGTH}}".encode('utf-8')
     return header+message
 
+HEADER_LENGTH = 10
+
+client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+client.connect(('10.250.52.110', 12340))
+auth = False
+username = ''
+
+
 try:
-    command = input("Press C to Create an Account and L to Login")
-    while command != "C" and command != "L":
-        print("Please select either C or L\n")
-        command = input("Press C to Create an Account and L to Login")
 
-    while not auth:
-        username = input("Please enter a username:")
-        print("line 38")
-        if command == "C":
-            print("line 40")
-            request_message = f"CA:{username}"
-            request_message = encoded_message(request_message)
-            client.send(request_message)
+    # Get all existing accounts
+    message = f"LA:{username}"
+    message = encoded_message(message)
+    client.send(message)
 
-            header = client.recv(HEADER_LENGTH).decode('utf-8')
-            confirmation_length = int(header.strip())
-            confirmation = client.recv(confirmation_length).decode('utf-8')
-            
-            print("CONFIRMATION:",confirmation.split(":"))
-            confirmation = confirmation.split(":")[3]
-            
-            if confirmation == "Successful-Account-Creation.":
-                auth = True
-                print(bcolors.OKGREEN + confirmation + bcolors.ENDC)
-            else:
-                username = ''
-                print(bcolors.FAIL + confirmation + bcolors.ENDC)
+    header = client.recv(HEADER_LENGTH).decode('utf-8').strip()
+    data_length = int(header)
+    data = client.recv(data_length).decode('utf-8')
 
-        else:
-            request_message = f"L:{username}"
-            request_message = encoded_message(request_message)
-            client.send(request_message)
-
-            header = client.recv(HEADER_LENGTH).decode('utf-8').strip()
-            # print("HEADER:",header)
-            confirmation_length = int(header.strip())
-            confirmation = client.recv(confirmation_length).decode('utf-8')
-
-            confirmation = confirmation.split(":")[3]
-
-            if confirmation == "Login-Successful.":
-                auth = True
-                print(bcolors.OKGREEN + confirmation + bcolors.ENDC)
-            else:
-                print(bcolors.FAIL + confirmation + bcolors.ENDC)
-
-    # def authenticate():
-    #     print(bcolors.OKGREEN + "Would you like to CREATE an account or LOGIN to an existing user from above? " + bcolors.ENDC)
-    #     decision = input("Type " + bcolors.BOLD + "C" + bcolors.ENDC + " to create an account. Type " + bcolors.BOLD + "L" + bcolors.ENDC + " to login in." )
-    #     while (decision != "C" and decision != "L"):
-    #         print("please type a valid decision.")
-    #         decision = input("Type " + bcolors.BOLD + "C" + bcolors.ENDC + " to create an account. Type " + bcolors.BOLD + "L USERNAME" + bcolors.ENDC + " to login into USERNAME." )
-    #     if decision == "C":
-    #         while not auth:
-    #         # Create Account
-    #             if auth:
-    #                 break
-    #             usernameSubmit = input("What username would you like to create?\n")
-    #                 # WE DID NOT make seperate class like Message because it is trivial
-    #             create_account_command = f"CA:{usernameSubmit}"
-    #             create_account_command = encoded_message(create_account_command)
-    #                 # create_account_command.encode('UTF-8')
-    #             client.send(create_account_command)
-    #             username = usernameSubmit
-    #             # print("username outside of while loop: ", username)
-    #             # self.username = username
-    #     elif decision == "L":
-    #         # Attempt to Login
-    #         print("login")
-
+    allAccounts = data.split("|")[1:]
+    print(bcolors.OKGREEN + "The server holds the following accounts." + bcolors.ENDC)
+    for account in allAccounts:
+        print(" -- > " + account)
+    
+    goBack = True
+    while goBack:
         
+        command = input("Type " + bcolors.BOLD + "C" + bcolors.ENDC + " to create an account. Type " + bcolors.BOLD + "L" + bcolors.ENDC + " to login in." )
+        while command != "C" and command != "L":
+            print("Please select either C or L\n")
+            command = input("Type " + bcolors.BOLD + "C" + bcolors.ENDC + " to create an account. Type " + bcolors.BOLD + "L" + bcolors.ENDC + " to login in." )
+
+        while not auth:
+            print("Usernames must be alphanumeric characters.\n(Type "+bcolors.BOLD+"!"+bcolors.ENDC+" to go back)")
+            username = input("Please enter a username:")
+            # print("line 38")
+
+            if command == "C" and username != "!":
+                # print("line 40")
+                request_message = f"CA:{username}"
+                request_message = encoded_message(request_message)
+                client.send(request_message)
+
+                header = client.recv(HEADER_LENGTH).decode('utf-8')
+                confirmation_length = int(header.strip())
+                confirmation = client.recv(confirmation_length).decode('utf-8')
+                
+                confirmation = confirmation.split(":",3)[3]
+                
+                if confirmation == "Successful-Account-Creation.":
+                    auth = True
+                    goBack = False
+                    print(bcolors.OKGREEN + confirmation + bcolors.ENDC)
+                else:
+                    username = ''
+                    print(bcolors.FAIL + confirmation + bcolors.ENDC)
+
+            elif username != "!":
+                request_message = f"L:{username}"
+                request_message = encoded_message(request_message)
+                client.send(request_message)
+
+                header = client.recv(HEADER_LENGTH).decode('utf-8').strip()
+                # print("HEADER:",header)
+                confirmation_length = int(header.strip())
+                confirmation = client.recv(confirmation_length).decode('utf-8')
+
+                confirmation = confirmation.split(":",3)[3]
+
+                if confirmation == "Login-Successful.":
+                    auth = True
+                    goBack = False
+                    print(bcolors.OKGREEN + confirmation + bcolors.ENDC)
+                else:
+                    print(bcolors.FAIL + confirmation + bcolors.ENDC)
+            else:
+                break            
+
+
     def client_receive():
         while True:
             try:
@@ -158,12 +159,11 @@ try:
                 # TODO we should catch all server messages from above -- so we should say if data.sender is not SERVER
                 if data.sender != "SERVER":
                     print(bcolors.OKCYAN + "[" + data.sender + "] " + bcolors.ENDC + data.data)
-            
+
             except Exception as e:
                 print(bcolors.WARNING +'Error! '+ str(e) + bcolors.ENDC)
                 client.close()
-                break
-            
+                break       
 
     def client_send():
         
@@ -209,7 +209,6 @@ try:
 
             
     # USER IS NOW AUTHENTICATED
-
     # Open up client to send and receive messages from server
     receive_thread = threading.Thread(target=client_receive)
     receive_thread.start()

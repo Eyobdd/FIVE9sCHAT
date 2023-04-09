@@ -1,6 +1,3 @@
-HEADER_LENGTH = 10
-
-
 # Command objects are created from buffer in protocol_unpack
 # Data Stored:
 #  - socket information

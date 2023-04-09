@@ -1,13 +1,28 @@
 import threading
 import socket
+import sys
 
 from message import Message
 from command import Command
 
 # Constants
 HEADER_LENGTH = 10
-HOST = '10.250.52.110'
-PORT = 12340
+if len(sys.argv) != 3:
+    print("Please provide a Port Number and ServerID in the command line.\nExample: python3 server.py <ID> <Port Number>")
+    sys.exit()
+
+serverList = {
+    '1': ('10.250.92.212',1811)
+    '2': ('10.250.92.212',2822)
+    '3': ('10.250.92.212',3833)
+}
+
+SERVERID = sys.argv[1]
+HOST = '10.250.92.212'
+PORT = int(sys.argv[2])
+
+IS_LEADER = (int(SERVERID) == 1)
+
 
 # Connect sockets to server
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -19,18 +34,40 @@ server.listen()
 # Stores active socket
 clients = []
 
+# Stores active servers
+servers = []
+
+# Stores active serverIDs
+serverIDs = []
+
 # Stores active usernames
-usernames = [] 
+usernames = []
 
 
 # Stores all active users {username:socket} pairs
 clientID = {}
 
+# Stores all active servers {serverID:socket} pairs
+serverID = {}
+
 # Stores if a user is online or not all accounts {username:Boolean}
 loginStatus = {}
 
+# Stores if a server is online or not {serverID:Boolean}
+serverStatus = {}
+
 # The server is always online so users cannot log into the server account
-loginStatus['SERVER'] = True
+# loginStatus['SERVER'] = True
+
+serverStatus[SERVERID] = True
+serverID[SERVERID] = server
+servers.append(server)
+serverIDs.append(SERVERID)
+
+# for server in serverList:
+#     ip, port = serverList[server]
+#     if port == PORT:
+        
 
 # Stores all messages to offline users {username: Message()}
 queuedMessages = {}
@@ -64,17 +101,11 @@ def protocol_action(obj):
 
         # If recipient exists -> sends error to client if they do not
         if obj.recipient not in loginStatus:
-            # doesNotExist = "The user you are trying to contact does not exist."
-            # doesNotExist = Message(obj.sender, "SERVER", doesNotExist)
-            # sendToClient(obj.sender, doesNotExist.encode())
 
             sendToClient(obj.sender, "The user you are trying to contact does not exist.")
 
         # If recipient is logged-out -> Alerts sender and and queues the message
         elif not loginStatus[obj.recipient]:
-            # notlogin = obj.recipient + " is not logged in. But your message will be delivered"
-            # notlogin = Message(obj.sender, "SERVER", notlogin)
-            # sendToClient(obj.sender,notlogin.encode())
 
             sendToClient(obj.sender, f"{obj.recipient} is not logged in. But your message will be delivered")
 
@@ -84,10 +115,6 @@ def protocol_action(obj):
 
         # Else sends the message to recipient and delivery confirmation to sender
         elif (clientID[obj.recipient] in clients):
-            # success = "Your message has successfully delivered."
-            # success = Message(obj.sender, "SERVER", success)
-            # sendToClient(obj.recipient, obj.encode())
-            # sendToClient(obj.sender, success.encode())
             clientID[obj.recipient].send(obj.encode())
             sendToClient(obj.sender, "Your message has successfully delivered.")
     
@@ -100,9 +127,6 @@ def protocol_action(obj):
             # User must be online execute this Command so no checks are needed
 
             # Send confirmation to user
-            # success = "Account-Successfully-Deleted"
-            # success = Message(obj.username, "SERVER", success)
-            # sendToClient(obj.username, success.encode())
             sendToClient(obj.username,"Account-Successfully-Deleted")
 
 
@@ -139,10 +163,7 @@ def protocol_action(obj):
                 allAccounts = allAccounts[:-1]
 
             # Sends list to client to display
-            # allAccounts = Message(obj.username, "SERVER", allAccounts)
-            # sendToClient(obj.username, allAccounts.encode())
             sendToClient(obj.username, allAccounts)
-
 
 # Protocol unpack returns Message() and Command() from protocol buffers
 # Takes a client socket and encoded buffer data
@@ -329,6 +350,27 @@ def handle_client(client):
             broadcast(f'{username} has left the chat room!')
             break
 
+def encoded_message(message):
+    message = message.encode('utf-8')
+    header = f"{len(message) :< {HEADER_LENGTH}}".encode('utf-8')
+    return header+message
+
+def handle_server(client):
+    client.send(encoded_message("SR"))
+    while True:
+        try:
+            print("SERVER CONNECTED")
+
+        except:
+            index = servers.index(client)
+            del servers[index]
+            ID = serverIDs[index]
+            serverStatus[ID] = False
+            break
+                
+
+    client.send(encoded_message(""))
+
 
 # receive() listens for client connections and starts new threads when found
 def receive():
@@ -340,14 +382,27 @@ def receive():
 
         # Accepts new client on client connection
         client, address = server.accept()
-        
-        # Logs client connection information
-        print(f'connection is established with: {str(address)}')
-        print((f'connection is established with CLIENT :\n{client}'))
 
-        # Creates a new thread to handle client-server communication
-        thread = threading.Thread(target=handle_client, args=(client,))
-        thread.start()
+        # Check for if new connection is a server or a client
+        message = receiveData(client)
+
+        print(f'connection is established with: {str(address)}')
+
+        if message == 'CL':
+
+            # Logs client connection information
+            print((f'connection is established with CLIENT :\n{client}'))
+
+            # Creates a new thread to handle client-server communication
+            thread = threading.Thread(target=handle_client, args=(client,))
+            thread.start()
+        
+        if message == 'SR':
+
+            print((f'connection is established with SERVER :\n{client}'))
+
+            thread = threading.Thread(target=handle_server, args=(client,))
+            thread.start()
 
 # onConnection() broadcasts a username and dequeues their messages
 def onConnection(username):

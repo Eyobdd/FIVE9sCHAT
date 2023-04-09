@@ -35,11 +35,12 @@ def encoded_message(message):
 
 # Defined header length throughout wire protocol
 HEADER_LENGTH = 10
-HOST = '10.250.52.110'
+HOST = '10.250.92.212'
 # Create a socket and connect to the server
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client.connect((HOST, 12340))
+client.connect((HOST, 12345))
 
+client.send(encoded_message("CL"))
 
 # User initially starts unnamed and unauthenticated
 auth = False

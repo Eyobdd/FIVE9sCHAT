@@ -23,6 +23,11 @@ server2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server2.bind((HOST, PORT-5))
 server2.listen()
 
+ports = [12340, 12341, 12342]
+serverActives = [0,0,0]
+ME = ports.index(PORT)
+serverActives[ME] = 1
+
 # Information storage structures
 
 # Stores active socket
@@ -203,6 +208,39 @@ def broadcast(message):
         # # Sends message to user
         sendToClient(username,message)
 
+def findLeader():
+    if serverActives[0] == 1:
+        return 1
+    elif serverActives[1] == 1:
+        return 2
+    elif serverActives[2] == 1:
+        return 3 
+def handle_server(server, number):
+    # if server 1 is connecting to you, then set its activity status to True
+    serverActives[number - 1] = 1
+    
+    # see if you need to change leadership
+    leader = findLeader()
+    print("LEADER IS SERVER", leader)
+
+    # Receive information from server1
+
+    
+    # Share information to server 1
+
+    while True:
+        try:
+            data = receiveData(server)
+            print(data)
+        # This exception handles client crashes and logouts
+        except:
+
+            # Update leader after the server drops
+            serverActives[number - 1] = 0
+            leader = findLeader()
+            print("LEADER IS NOW: ", leader)
+            server.close()
+
 # Server thread to handle client <-> server communications
 def handle_client(client):
 
@@ -342,7 +380,7 @@ def handle_client(client):
 # receive() listens for client connections and starts new threads when found
 def receive():
     # When server starts
-    print('Server 1 Open connection is running and listening ...')
+    print('Openning connection, running, and listening ...')
 
     while True:
 
@@ -350,19 +388,22 @@ def receive():
         client, address = server1.accept()
         # Logs client connection information
         print(f'connection is established with: {str(address)}')
-        connection = 'A GENERIC SERVER'
+        connection = ''
         if str(address[1]) == '12349' or str(address[1]) == '12346':
             connection = "SERVER1"
             # Open up receivng thread with Server 1
-
+            thread = threading.Thread(target=handle_server, args=(client,1))
+            thread.start()
         elif str(address[1]) == '12350' or str(address[1]) == '12347':
             connection = "SERVER2"
             # Open up receiving thread with Server 2
-
+            thread = threading.Thread(target=handle_server, args=(client,2))
+            thread.start()
         elif str(address[1]) == '12351' or str(address[1]) == '12348':
             connection = "SERVER3"
             # Open up receiving thread with Server 3
-
+            thread = threading.Thread(target=handle_server, args=(client,3))
+            thread.start()
         else:
             # Open up a receiving thread with the client
             connection = "CLIENT"

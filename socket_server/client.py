@@ -35,7 +35,7 @@ def encoded_message(message):
 
 # Defined header length throughout wire protocol
 HEADER_LENGTH = 10
-HOST = '10.250.52.110'
+HOST = '10.250.209.143'
 # Create a socket and connect to the server
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect((HOST, 12340))

@@ -7,6 +7,30 @@
 # 9. Create Uniform Error Code System -- future
 # 10. Create decode abstraction.  -- if time
 
+## GOOD CASE
+
+# SERVER - PORT 12340
+# SERVER - PORT 12341
+# SERVER - PORT 12342
+
+## DROP1 CASE
+
+# SERVER - PORT 12340 AND THEN X
+# SERVER - PORT 12341 X
+# SERVER - PORT 12342
+
+## DROP2 CASE
+
+# SERVER - PORT 12340 AND THEN X
+# SERVER - PORT 12341 
+# SERVER - PORT 12342 X
+
+
+## SIMPLE DROP CASE
+
+# SERVER - PORT 12340 X
+# SERVER - PORT 12341 
+# SERVER - PORT 12342 
 
 # Import modules used
 import threading
@@ -35,7 +59,7 @@ def encoded_message(message):
 
 # Defined header length throughout wire protocol
 HEADER_LENGTH = 10
-HOST = '10.250.52.110'
+HOST = '10.250.209.143'
 # Create a socket and connect to the server
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect((HOST, 12340))

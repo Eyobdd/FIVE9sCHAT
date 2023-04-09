@@ -240,6 +240,7 @@ def handle_server(server, number):
             leader = findLeader()
             print("LEADER IS NOW: ", leader)
             server.close()
+            return
 
 # Server thread to handle client <-> server communications
 def handle_client(client):

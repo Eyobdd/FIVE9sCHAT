@@ -1,5 +1,5 @@
 
-# CS262 FIVE9sCHAT (Design Exercise #3 Fault tolerat and Persistent)
+# CS262 FIVE9sCHAT (Design Exercise #3 Fault tolerant and Persistent)
 
 This repository includes code for the 2-fault tolerant socket-server implementation (where we design our own wire protocol) a basic chat application (FIVE9sCHAT). 
 

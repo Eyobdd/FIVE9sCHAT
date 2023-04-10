@@ -61,6 +61,7 @@ def encoded_message(message):
 # Defined header length throughout wire protocol
 HEADER_LENGTH = 10
 HOST = '10.250.209.143'
+HOST2 = '10.250.92.212'
 # Create a socket and connect to the server
 client1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client1.connect((HOST, 12340))
@@ -325,7 +326,7 @@ try:
 
     # prob need a try here later
         client2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client2.connect((HOST, 12341))
+        client2.connect((HOST2, 12341))
 
         request_message = f"L:{username}"
         request_message = encoded_message(request_message)
@@ -348,7 +349,7 @@ try:
             x = 3
 
     client3 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client3.connect((HOST, 12342))
+    client3.connect((HOST2, 12342))
 
     request_message = f"L:{username}"
     request_message = encoded_message(request_message)

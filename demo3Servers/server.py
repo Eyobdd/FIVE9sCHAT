@@ -28,6 +28,7 @@ socket2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 print("order")
 HEADER_LENGTH = 10
 HOST = '10.250.209.143'
+HOST2 = '10.250.92.212'
 PORT = int(sys.argv[1])
 
 # Connect sockets to server
@@ -625,9 +626,8 @@ if __name__ == "__main__":
     # attempt to connect to the three servers
     print("MY PORT IS ", PORT)
     if PORT == 12340:
-        socket1.connect((HOST, 12341))
-        socket2.connect((HOST, 12342))
-
+        socket1.connect((HOST2, 12341))
+        socket2.connect((HOST2, 12342))
     elif PORT == 12341:
         socket1.connect((HOST, 12340))
         socket2.connect((HOST, 12342))

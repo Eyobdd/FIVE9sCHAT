@@ -5,7 +5,8 @@ import sys
 from message import Message
 from command import Command
 import time
-
+import pickle
+import os
 
 class bcolors:
     HEADER = '\033[95m'
@@ -63,7 +64,38 @@ loginStatus['SERVER'] = True
 
 # Stores all messages to offline users {username: Message()}
 queuedMessages = {}
+queueCounter = 0
+filename = str(PORT) + "chatHistory.pickle"
 
+if os.path.isfile(filename):
+
+    with open(filename, 'rb') as handle:
+        queuedMessages = pickle.load(handle)
+else:
+    queuedMessages = {}
+
+pickleMessage = pickle.dumps(queuedMessages)
+#with open('12341chatHistory.pickle', 'rb') as handle:
+#    syn2 = pickle.load(handle)
+#with open('12340chatHistory.pickle', 'rb') as handle:
+#    syn3 = pickle.load(handle)
+
+#k1 = len(syn.keys())
+#k2 = len(syn2.keys())
+#k3 = len(syn3.keys())
+
+#m = max([k1,k2,k3])
+#finalSynch = {}
+#if k1 == m:
+#    finalSynch = syn
+#elif k2 == m:
+#    finalSynch = syn2
+#elif k3 == m:
+#    finalSynch - syn3
+#queuedMessages = finalSynch
+
+# The server is always online so users cannot log into the server account
+loginStatus['SERVER'] = True
 
 def encoded_message(message):
     message = message.encode('utf-8')
@@ -86,7 +118,12 @@ def sendToClient(username, message):
 def receiveData(client):
     data = client.recv(HEADER_LENGTH).decode('utf-8')
     data_length = int(data.strip())
-    data = client.recv(data_length).decode('utf-8')
+    try:
+        data = client.recv(data_length).decode('utf-8')
+    except:
+        print("possible non-string bytes")
+        data = client.recv(data_length)
+        print(data)
     return data
 
 def receiveDataServer(server):
@@ -104,12 +141,24 @@ def serverUnpack(data):
         m.print()
         queuedMessages[m.recipient].append(m)
         print("QUEUED messages are: ", queuedMessages)
-    if dataSplit[0] == "C":
+        filename = str(PORT) + 'chatHistory.pickle'
+        with open(filename, 'wb') as handle:
+            pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    elif dataSplit[0] == "C":
         username = dataSplit[1]
         loginStatus[username] = False
         queuedMessages[username] = []
         print("usernames: ", loginStatus)
-    if dataSplit[0] == "D":
+        filename = str(PORT) + 'accounts.pickle'
+        with open(filename, 'wb') as handle:
+            pickle.dump(loginStatus, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        
+        filename = str(PORT) + 'chatHistory.pickle'
+        with open(filename, 'wb') as handle:
+            pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    elif dataSplit[0] == "D":
         username = dataSplit[1]
         del loginStatus[username]
         del queuedMessages[username]
@@ -117,6 +166,17 @@ def serverUnpack(data):
         print("usernames: ", loginStatus)
         print("QUEUED messages are: ", queuedMessages)
 
+        with open(filename, 'wb') as handle:
+                pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    # else:
+        
+    #     queueCounter +=1
+    #     qProposal = pickle.loads(dataSplit[1])
+    #     print("looking at a proposal", qProposal)
+    #     if len(qProposal) > len(queuedMessages):
+    #         queuedMessages = qProposal
+    #     if queueCounter == 2:
+    #         print(bcolors.OKGREEN + "SYNCHRONIZED. " + bcolors.ENDC)
 # Protocol action handles all actions by the server according to our Protocol
 # Input is either a Message() or Command() object
 def protocol_action(obj):
@@ -168,17 +228,32 @@ def protocol_action(obj):
             sendToClient(obj.username,"Account-Successfully-Deleted")
             message = "D:" + obj.username
             message = encoded_message(message)
-            socket1.send(message)
-            socket2.send(message)
+            if ME == 0:
+                    if serverActives[1] == 1:
+                        socket1.send(message)
+                    if serverActives[2] == 1:
+                        socket2.send(message)
+            if ME == 1:
+                    if serverActives[0] == 1:
+                        socket1.send(message)
+                    if serverActives[2] == 1:
+                        socket2.send(message)
+            if ME == 2:
+                    if serverActives[1] == 1:
+                        socket1.send(message)
+                    if serverActives[0] == 1:
+                        socket2.send(message)
+           
 
             # Remove user from loginStatus and clientID list
             del loginStatus[obj.username]
             del clientID[obj.username]
 
             # Only delete from queued messages if user had queued messages. 
-            if obj.username in queuedMessages.keys():
-                del queuedMessages[obj.username]
-
+            del queuedMessages[obj.username]
+            filename = str(PORT) + 'chatHistory.pickle'
+            with open(filename, 'wb') as handle:
+                pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
         # If Command type is LA -> Lists all stored accounts with their login status
         elif obj.actionType == "LA":
 
@@ -244,7 +319,7 @@ def protocol_unpack(client):
 
         # Return Command() 
         return Command.createCommandFromBuffer(client, None ,username,type_)
-
+    
 
 # Function sends a message to all active accounts 
 def broadcast(message):
@@ -269,16 +344,35 @@ def findLeader():
 
 def handle_server(server, number):
     # if server 1 is connecting to you, then set its activity status to True
+    global queuedMessages
     serverActives[number - 1] = 1
     
     # see if you need to change leadership
     leader = findLeader()
     print("LEADER IS SERVER", leader)
 
-    # Receive information from server1
 
+    # Do a one-time receive to synchronize queued messages across servers
+    qProposal = server.recv(1024)
+    qProposal = pickle.loads(qProposal)
+    proposalCount = 0
+    for x in qProposal:
+        if isinstance(qProposal[x], list):
+            proposalCount += len(qProposal[x])
+    localCount = 0
+    for i in queuedMessages:
+        if isinstance(queuedMessages[i], list):
+            localCount += len(queuedMessages[i])
+
+    print(bcolors.OKBLUE + "SYNCHRONIZING with SERVER" + str(number) + bcolors.ENDC)
+    if proposalCount > localCount:
+        queuedMessages = qProposal
+        print("UPDATED DATA")
     
-    # Share information to server 1
+    print(bcolors.OKBLUE + "<LOADED ACCOUNTS" + bcolors.ENDC)
+
+    for username in queuedMessages.keys():
+        loginStatus[username] = False
 
     while True:
         try:
@@ -359,6 +453,12 @@ def handle_client(client, server1, server2):
                 clients.append(client)
                 clientID[username] = client
                 loginStatus[username] = True
+                queuedMessages[username] = []
+                
+                filename = str(PORT) + 'chatHistory.pickle'
+                with open(filename, 'wb') as handle:
+                    pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
                 message = "C:" + username
                 message = encoded_message(message)
                 socket1.send(message)
@@ -411,6 +511,10 @@ def handle_client(client, server1, server2):
             # Applies wire protocol to buffer -> returns a Message() or Command() objects
             obj = protocol_unpack(client)
             if isinstance(obj, Message):
+                queuedMessages[obj.recipient].append(obj)
+                filename = str(PORT) + 'chatHistory.pickle'
+                with open(filename, 'wb') as handle:
+                    pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
                 if ME == 0:
                     if serverActives[1] == 1:
                         socket1.send(obj.encode())
@@ -523,10 +627,14 @@ if __name__ == "__main__":
     if PORT == 12340:
         socket1.connect((HOST, 12341))
         socket2.connect((HOST, 12342))
+
     elif PORT == 12341:
         socket1.connect((HOST, 12340))
         socket2.connect((HOST, 12342))
     elif PORT == 12342:
         socket1.connect((HOST, 12341))
         socket2.connect((HOST, 12340))
+    socket1.send(pickleMessage)
+    socket2.send(pickleMessage)
+
     receive()

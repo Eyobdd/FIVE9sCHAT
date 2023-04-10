@@ -237,7 +237,7 @@ try:
             # Any general errors are caught here
             except Exception as e:
 
-                print(bcolors.WARNING +'Error! '+ str(e) + bcolors.ENDC)
+                print(bcolors.WARNING +'SERVER DROPPED. RECONNECTING. PRESS ENTER. ' + bcolors.ENDC)
                 connection.close()
                 SERVERSTATE = SERVERSTATE + 1
                 sys.exit()

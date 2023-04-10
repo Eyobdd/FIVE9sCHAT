@@ -33,6 +33,7 @@
 # SERVER - PORT 12342 
 
 # Import modules used
+import sys
 import threading
 import socket
 import os
@@ -51,7 +52,6 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-
 # Creates an encoded bitstring from a message using our wire protocol
 def encoded_message(message):
     message = message.encode('utf-8')
@@ -60,50 +60,21 @@ def encoded_message(message):
 
 # Defined header length throughout wire protocol
 HEADER_LENGTH = 10
-HOST = '10.250.92.212'
-
+HOST = '10.250.209.143'
 # Create a socket and connect to the server
+client1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+client1.connect((HOST, 12340))
 
-activeServers = [True,True,True]
+#client2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#client2.connect((HOST, 12341))
 
-clientToS1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-clientToS1.connect((HOST, 12340))
-
-clientToS2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-clientToS2.connect((HOST, 12341))
-
-clientToS3 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-clientToS3.connect((HOST, 12342))
-
-socket_list = [clientToS1,clientToS2,clientToS3]
-
-# client = clientToS1
-
-def chooseClient():
-    if activeServers[0]:
-        return socket_list[0]
-    if activeServers[1]:
-        return socket_list[1]
-    if activeServers[2]:
-        return socket_list[2]
-
-def receiveFromServer():
-    print("RFS-CLIENT_ID:",client_ID-1)
-    client = chooseClient()
-    print("RFS-Client:",client)
-    header = client.recv(HEADER_LENGTH).decode('utf-8').strip()
-    data_length = int(header)
-    return client.recv(data_length).decode('utf-8')
-
-def sendToServer(message):
-    print("STS-CLIENT_ID:",client_ID-1)
-    client = chooseClient()
-    print("STS-Client:",client)
-    client.send(encoded_message(message))
-
-
-
+#client3 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#client3.connect((HOST, 12342))
 # User initially starts unnamed and unauthenticated
+
+SERVERSTATE = 1
+
+
 auth = False
 username = ''
 
@@ -112,10 +83,9 @@ try:
     ## Display all existing accounts
 
     # Retrieves list from server of all existing accounts
-    # header = client.recv(HEADER_LENGTH).decode('utf-8').strip()
-    # data_length = int(header)
-    # data = client.recv(data_length).decode('utf-8')
-    data = receiveFromServer()
+    header = client1.recv(HEADER_LENGTH).decode('utf-8').strip()
+    data_length = int(header)
+    data = client1.recv(data_length).decode('utf-8')
 
     # Displays all accounts with their activity status
     allAccounts = data.split("|")[1:]
@@ -149,15 +119,13 @@ try:
                 
                 # Sends Create account request to server
                 request_message = f"CA:{username}"
-                # request_message = encoded_message(request_message)
-                # client.send(request_message)
-                sendToServer(request_message)
+                request_message = encoded_message(request_message)
+                client1.send(request_message)
 
                 # Awaits and receives server confirmation
-                # header = client.recv(HEADER_LENGTH).decode('utf-8')
-                # confirmation_length = int(header.strip())
-                # confirmation = client.recv(confirmation_length).decode('utf-8')
-                confirmation = receiveFromServer()
+                header = client1.recv(HEADER_LENGTH).decode('utf-8')
+                confirmation_length = int(header.strip())
+                confirmation = client1.recv(confirmation_length).decode('utf-8')
                 
                 # Takes the confirmation message only
                 confirmation = confirmation.split(":",3)[3]
@@ -182,16 +150,13 @@ try:
                 
                 # Send Login request to server
                 request_message = f"L:{username}"
-                # request_message = encoded_message(request_message)
-                # client.send(request_message)
-                sendToServer(request_message)
+                request_message = encoded_message(request_message)
+                client1.send(request_message)
 
                 # Awaits and recieves confirmation from server
-                # header = client.recv(HEADER_LENGTH).decode('utf-8').strip()
-                # confirmation_length = int(header.strip())
-                # confirmation = client.recv(confirmation_length).decode('utf-8')
-
-                confirmation = receiveFromServer()
+                header = client1.recv(HEADER_LENGTH).decode('utf-8').strip()
+                confirmation_length = int(header.strip())
+                confirmation = client1.recv(confirmation_length).decode('utf-8')
 
                 # Retrieve confirmation message
                 confirmation = confirmation.split(":",3)[3]
@@ -215,16 +180,15 @@ try:
                 break            
 
     # Thread that listens for communications from the server
-    def client_receive(client_ID):
-        client_ID=1
+    def client_receive(connection):
+        global SERVERSTATE
         while True:
             try:
 
                 # Receives data sent by server
-                # data_header = client.recv(HEADER_LENGTH).decode('utf-8')
-                # data_length = int(data_header.strip())
-                # data = client.recv(data_length).decode('utf-8')
-                data = receiveFromServer()
+                data_header = connection.recv(HEADER_LENGTH).decode('utf-8')
+                data_length = int(data_header.strip())
+                data = connection.recv(data_length).decode('utf-8')
 
                 # Converts received data into a message object
                 data = Message.createMessageFromBuffer(data)
@@ -274,28 +238,17 @@ try:
             except Exception as e:
 
                 print(bcolors.WARNING +'Error! '+ str(e) + bcolors.ENDC)
-                print("CLIENT_ID:",client_ID-1)
-                print("ACTIVESERVERS:",activeServers)
-                activeServers[client_ID-1] = False
-                print("ACTIVESERVERS:",activeServers)
-                if activeServers[0]:
-                    client_ID = 1
-                elif activeServers[1]:
-                    client_ID = 2
-                elif activeServers[2]:
-                    client_ID = 3
-                else:
-                    raise Exception("Connection Error: All servers are unreachable.")
-                print("CLIENT_ID:",client_ID-1)
-                print("CLIENT:",socket_list[client_ID-1])
-                break       
+                connection.close()
+                SERVERSTATE = SERVERSTATE + 1
+                sys.exit()
 
 
     # Thread that sends authenticated communication to the server
-    def client_send():
-        
+    def client_send(connection, state):
+        global SERVERSTATE
         while True:
-
+            if state != SERVERSTATE:
+                sys.exit()
             # Asks user for input
             inp = input(bcolors.BOLD +"COMMANDS" + bcolors.ENDC + ": " + bcolors.BOLD + "\n" +"LA" + bcolors.ENDC + " - List accounts. "+ bcolors.BOLD + "\n" + "USERNAME-> MESSAGE" + bcolors.ENDC+ " - Send USERNAME MESSAGE." + "\n" + bcolors.BOLD + "DA" + bcolors.ENDC + " - Delete your account."+"\n" + bcolors.BOLD + "Q" + bcolors.ENDC + " - Quit client program."+"\n")
             
@@ -314,18 +267,16 @@ try:
 
                         # Sends List Accounts request
                         message = f"LA:{username}"
-                        # message = encoded_message(message)
-                        # client.send(message)
-                        sendToServer(message)
-
+                        message = encoded_message(message)
+                        connection.send(message)
+                        
                     # Check if it is a Delete Account request
                     elif inp == "DA":
                         
                         # Sends delete account request with authorized username
                         message = f"DA:{username}"
-                        # message = encoded_message(message)
-                        # client.send(message)
-                        sendToServer(message)
+                        message = encoded_message(message)
+                        connection.send(message)
 
                     # Check if the user is trying to quit the program
                     elif inp == "Q":
@@ -350,24 +301,67 @@ try:
                     message = inputList[1]
 
                     # Creates a message object
-                    # message = Message(recipient, username, message)
-                    # message = message.encode()
-                    message = f"M:{recipient}:{username}:{message}" #.encode('utf-8')
+                    message = Message(recipient, username, message)
+                    message = message.encode()
 
                     # Sends message to server
-                    # client.send(message)
-                    sendToServer(message)
+                    connection.send(message)
 
 
             
     # USER IS NOW AUTHENTICATED
     # Open up thread to send and receive messages from server
-    receive_thread = threading.Thread(target=client_receive,args=(client_ID,))
-    receive_thread.start()
+    receive_thread1 = threading.Thread(target=client_receive, args=[client1])
+    receive_thread1.start()
 
-    send_thread = threading.Thread(target=client_send)
-    send_thread.start()
+    send_thread1 = threading.Thread(target=client_send, args= [client1, 1])
+    send_thread1.start()
+
+    while receive_thread1.is_alive() or send_thread1.is_alive():
+        x = 3
+    
+    server2GoesThrough = True
+    try:
+
+    # prob need a try here later
+        client2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client2.connect((HOST, 12341))
+
+        request_message = f"L:{username}"
+        request_message = encoded_message(request_message)
+        client2.send(request_message)
+
+        receive_thread2 = threading.Thread(target=client_receive, args=[client2])
+        receive_thread2.start()
+
+        send_thread2 = threading.Thread(target=client_send, args= [client2, 2])
+        send_thread2.start()
+
+    except:
+        server2GoesThrough = False
+        SERVERSTATE = 3
+        print("server 2 must have been dropped...")
+    
+    
+    if server2GoesThrough:
+        while receive_thread2.is_alive() or send_thread2.is_alive():
+            x = 3
+
+    client3 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client3.connect((HOST, 12342))
+
+    request_message = f"L:{username}"
+    request_message = encoded_message(request_message)
+    client3.send(request_message)
+
+    receive_thread3 = threading.Thread(target=client_receive, args=[client3])
+    receive_thread3.start()
+
+    send_thread3 = threading.Thread(target=client_send, args= [client3, 3])
+    send_thread3.start()
+ 
 
 # If user exits with ^C it is caught here
 except KeyboardInterrupt:
     print(bcolors.BOLD + bcolors.FAIL + "EXITING CLIENT PROGRAM." + bcolors.ENDC)
+    

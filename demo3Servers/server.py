@@ -286,11 +286,10 @@ def handle_server(server, number):
             serverUnpack(data)
         # This exception handles client crashes and logouts
         except Exception as e:
-            print(bcolors.WARNING +'Error! '+ str(e) + bcolors.ENDC)
             # Update leader after the server drops
             serverActives[number - 1] = 0
             leader = findLeader()
-            print("LEADER IS NOW: ", leader)
+            print(bcolors.WARNING + "LEADER IS NOW: "  + str(leader) + bcolors.ENDC )
             server.close()
             return
 
@@ -412,9 +411,21 @@ def handle_client(client, server1, server2):
             # Applies wire protocol to buffer -> returns a Message() or Command() objects
             obj = protocol_unpack(client)
             if isinstance(obj, Message):
-
-                socket1.send(obj.encode())
-                socket2.send(obj.encode())
+                if ME == 0:
+                    if serverActives[1] == 1:
+                        socket1.send(obj.encode())
+                    if serverActives[2] == 1:
+                        socket2.send(obj.encode())
+                if ME == 1:
+                    if serverActives[0] == 1:
+                        socket1.send(obj.encode())
+                    if serverActives[2] == 1:
+                        socket2.send(obj.encode())
+                if ME == 2:
+                    if serverActives[1] == 1:
+                        socket1.send(obj.encode())
+                    if serverActives[0] == 1:
+                        socket2.send(obj.encode())
             # Applies an action to the object
             protocol_action(obj)
 

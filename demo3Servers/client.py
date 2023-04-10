@@ -51,6 +51,7 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+
 # Creates an encoded bitstring from a message using our wire protocol
 def encoded_message(message):
     message = message.encode('utf-8')
@@ -59,10 +60,47 @@ def encoded_message(message):
 
 # Defined header length throughout wire protocol
 HEADER_LENGTH = 10
-HOST = '10.250.209.143'
+HOST = '10.250.92.212'
+
 # Create a socket and connect to the server
-client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client.connect((HOST, 12340))
+
+activeServers = [True,True,True]
+
+clientToS1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+clientToS1.connect((HOST, 12340))
+
+clientToS2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+clientToS2.connect((HOST, 12341))
+
+clientToS3 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+clientToS3.connect((HOST, 12342))
+
+socket_list = [clientToS1,clientToS2,clientToS3]
+
+# client = clientToS1
+
+def chooseClient():
+    if activeServers[0]:
+        return socket_list[0]
+    if activeServers[1]:
+        return socket_list[1]
+    if activeServers[2]:
+        return socket_list[2]
+
+def receiveFromServer():
+    print("RFS-CLIENT_ID:",client_ID-1)
+    client = chooseClient()
+    print("RFS-Client:",client)
+    header = client.recv(HEADER_LENGTH).decode('utf-8').strip()
+    data_length = int(header)
+    return client.recv(data_length).decode('utf-8')
+
+def sendToServer(message):
+    print("STS-CLIENT_ID:",client_ID-1)
+    client = chooseClient()
+    print("STS-Client:",client)
+    client.send(encoded_message(message))
+
 
 
 # User initially starts unnamed and unauthenticated
@@ -74,9 +112,10 @@ try:
     ## Display all existing accounts
 
     # Retrieves list from server of all existing accounts
-    header = client.recv(HEADER_LENGTH).decode('utf-8').strip()
-    data_length = int(header)
-    data = client.recv(data_length).decode('utf-8')
+    # header = client.recv(HEADER_LENGTH).decode('utf-8').strip()
+    # data_length = int(header)
+    # data = client.recv(data_length).decode('utf-8')
+    data = receiveFromServer()
 
     # Displays all accounts with their activity status
     allAccounts = data.split("|")[1:]
@@ -110,13 +149,15 @@ try:
                 
                 # Sends Create account request to server
                 request_message = f"CA:{username}"
-                request_message = encoded_message(request_message)
-                client.send(request_message)
+                # request_message = encoded_message(request_message)
+                # client.send(request_message)
+                sendToServer(request_message)
 
                 # Awaits and receives server confirmation
-                header = client.recv(HEADER_LENGTH).decode('utf-8')
-                confirmation_length = int(header.strip())
-                confirmation = client.recv(confirmation_length).decode('utf-8')
+                # header = client.recv(HEADER_LENGTH).decode('utf-8')
+                # confirmation_length = int(header.strip())
+                # confirmation = client.recv(confirmation_length).decode('utf-8')
+                confirmation = receiveFromServer()
                 
                 # Takes the confirmation message only
                 confirmation = confirmation.split(":",3)[3]
@@ -141,13 +182,16 @@ try:
                 
                 # Send Login request to server
                 request_message = f"L:{username}"
-                request_message = encoded_message(request_message)
-                client.send(request_message)
+                # request_message = encoded_message(request_message)
+                # client.send(request_message)
+                sendToServer(request_message)
 
                 # Awaits and recieves confirmation from server
-                header = client.recv(HEADER_LENGTH).decode('utf-8').strip()
-                confirmation_length = int(header.strip())
-                confirmation = client.recv(confirmation_length).decode('utf-8')
+                # header = client.recv(HEADER_LENGTH).decode('utf-8').strip()
+                # confirmation_length = int(header.strip())
+                # confirmation = client.recv(confirmation_length).decode('utf-8')
+
+                confirmation = receiveFromServer()
 
                 # Retrieve confirmation message
                 confirmation = confirmation.split(":",3)[3]
@@ -171,14 +215,16 @@ try:
                 break            
 
     # Thread that listens for communications from the server
-    def client_receive():
+    def client_receive(client_ID):
+        client_ID=1
         while True:
             try:
 
                 # Receives data sent by server
-                data_header = client.recv(HEADER_LENGTH).decode('utf-8')
-                data_length = int(data_header.strip())
-                data = client.recv(data_length).decode('utf-8')
+                # data_header = client.recv(HEADER_LENGTH).decode('utf-8')
+                # data_length = int(data_header.strip())
+                # data = client.recv(data_length).decode('utf-8')
+                data = receiveFromServer()
 
                 # Converts received data into a message object
                 data = Message.createMessageFromBuffer(data)
@@ -227,7 +273,20 @@ try:
             # Any general errors are caught here
             except Exception as e:
                 print(bcolors.WARNING +'Error! '+ str(e) + bcolors.ENDC)
-                client.close()
+                print("CLIENT_ID:",client_ID-1)
+                print("ACTIVESERVERS:",activeServers)
+                activeServers[client_ID-1] = False
+                print("ACTIVESERVERS:",activeServers)
+                if activeServers[0]:
+                    client_ID = 1
+                elif activeServers[1]:
+                    client_ID = 2
+                elif activeServers[2]:
+                    client_ID = 3
+                else:
+                    raise Exception("Connection Error: All servers are unreachable.")
+                print("CLIENT_ID:",client_ID-1)
+                print("CLIENT:",socket_list[client_ID-1])
                 break       
 
 
@@ -254,16 +313,18 @@ try:
 
                         # Sends List Accounts request
                         message = f"LA:{username}"
-                        message = encoded_message(message)
-                        client.send(message)
-                        
+                        # message = encoded_message(message)
+                        # client.send(message)
+                        sendToServer(message)
+
                     # Check if it is a Delete Account request
                     elif inp == "DA":
                         
                         # Sends delete account request with authorized username
                         message = f"DA:{username}"
-                        message = encoded_message(message)
-                        client.send(message)
+                        # message = encoded_message(message)
+                        # client.send(message)
+                        sendToServer(message)
 
                     # Check if the user is trying to quit the program
                     elif inp == "Q":
@@ -288,17 +349,19 @@ try:
                     message = inputList[1]
 
                     # Creates a message object
-                    message = Message(recipient, username, message)
-                    message = message.encode()
+                    # message = Message(recipient, username, message)
+                    # message = message.encode()
+                    message = f"M:{recipient}:{username}:{message}" #.encode('utf-8')
 
                     # Sends message to server
-                    client.send(message)
+                    # client.send(message)
+                    sendToServer(message)
 
 
             
     # USER IS NOW AUTHENTICATED
     # Open up thread to send and receive messages from server
-    receive_thread = threading.Thread(target=client_receive)
+    receive_thread = threading.Thread(target=client_receive,args=(client_ID,))
     receive_thread.start()
 
     send_thread = threading.Thread(target=client_send)

@@ -19,13 +19,15 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 
-# START socket connections to the two other servers in the system.
 socket1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 socket2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 
+# Constants
+print("order")
 HEADER_LENGTH = 10
 HOST = '10.250.209.143'
+HOST2 = '10.250.92.212'
 PORT = int(sys.argv[1])
 
 # UNIT TEST Init
@@ -75,8 +77,6 @@ loginStatus['SERVER'] = True
 # Stores all messages to offline users {username: Message()}
 queuedMessages = {}
 queueCounter = 0
-
-# Load queued messages (different case if we are unit testing)
 if (TESTING_PERSISTENCE):
     filename = "(UNIT_TESTS)persistenceTestChats/" + str(PORT) + "UNITTESTchatHistory.pickle"
 else:
@@ -87,16 +87,15 @@ if os.path.isfile(filename):
     if (TESTING_PERSISTENCE):
         print(bcolors.BOLD + bcolors.OKCYAN + "UNIT TEST: Loads own chat history from disk ✅" + bcolors.ENDC)
 else:
+
     queuedMessages = {}
 
-# Convert queued messages into a structure we can send over the sockets.
+
 pickleMessage = pickle.dumps(queuedMessages)
 
- # Make the server active.
 loginStatus['SERVER'] = True
 
 
-# Equality checking of message logs -- used for unit tests
 def messageLogEquals(d1, d2):
     for u in d1:
         for i in range(len(d1[u])):
@@ -104,7 +103,7 @@ def messageLogEquals(d1, d2):
                 return False
     return True
     
-# Encode the message before sending in sockets
+
 def encoded_message(message):
     message = message.encode('utf-8')
     header = f"{len(message) :< {HEADER_LENGTH}}".encode('utf-8')
@@ -134,8 +133,13 @@ def receiveData(client):
         print(data)
     return data
 
-# Received a message from another server, now act on that message.
-def serverProtocol(data):
+def receiveDataServer(server):
+    data = server.recv(1024).decode('utf-8')
+    data_length = int(data.strip())
+    data = server.recv(data_length).decode('utf-8')
+    return data
+
+def serverUnpack(data):
     print(data)
     dataSplit = data.split(":")
     if dataSplit[0] == "M":
@@ -143,27 +147,20 @@ def serverProtocol(data):
         m = Message.createMessageFromBuffer(data)
         m.print()
         queuedMessages[m.recipient].append(m)
-
-        # log
         print("QUEUED messages are: ", queuedMessages)
         with open(filename, 'wb') as handle:
             pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     elif dataSplit[0] == "C":
-
-        # account was created on a leader server -- we need to replicate it here
         username = dataSplit[1]
         loginStatus[username] = False
         queuedMessages[username] = []
         print("usernames: ", loginStatus)
-
-        # log
+        
         with open(filename, 'wb') as handle:
             pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     elif dataSplit[0] == "D":
-        # account was deleted on a leader server -- we need to replicate it here
-
         username = dataSplit[1]
         del loginStatus[username]
         del queuedMessages[username]
@@ -171,7 +168,6 @@ def serverProtocol(data):
         print("usernames: ", loginStatus)
         print("QUEUED messages are: ", queuedMessages)
 
-        #log
         with open(filename, 'wb') as handle:
                 pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -315,6 +311,7 @@ def protocol_unpack(client):
         # Return Command() 
         return Command.createCommandFromBuffer(client, None ,username,type_)
     
+
 # Function sends a message to all active accounts 
 def broadcast(message):
     
@@ -328,7 +325,6 @@ def broadcast(message):
         # # Sends message to user
         sendToClient(username,message)
 
-# Finds most recent active server (in the order of server 1,2,3)
 def findLeader():
     if serverActives[0] == 1:
         return 1
@@ -337,19 +333,18 @@ def findLeader():
     elif serverActives[2] == 1:
         return 3 
 
-# Thread to listen to server connection
 def handle_server(server, number):
+    # if server 1 is connecting to you, then set its activity status to True
     global queuedMessages
     global queueCounter
-
-    # Set the server's activity as online (since it is connecting to you).
     serverActives[number - 1] = 1
     
-    # See if you need to change leadership
+    # see if you need to change leadership
     leader = findLeader()
     print("LEADER IS SERVER", leader)
 
-    # Synchronize queued messages across servers
+
+    # Do a one-time receive to synchronize queued messages across servers
     qProposal = server.recv(1024)
     qProposal = pickle.loads(qProposal)
     proposalCount = 0
@@ -364,16 +359,14 @@ def handle_server(server, number):
     print(bcolors.OKBLUE + "SYNCHRONIZING with SERVER" + str(number) + bcolors.ENDC)
     if proposalCount > localCount:
         queuedMessages = qProposal
-    
-    # Load user acconts from chat logs
-    for username in queuedMessages.keys():
-        loginStatus[username] = False
+        print("UPDATED DATA")
     
     print(bcolors.OKBLUE + "<LOADED ACCOUNTS" + bcolors.ENDC)
 
+    for username in queuedMessages.keys():
+        loginStatus[username] = False
     queueCounter +=1
 
-    # Unit test -- see if you synchronized to the right log.
     if (TESTING_PERSISTENCE and queueCounter > 1):
 
         if messageLogEquals(UNITTESTVERIFY, queuedMessages):
@@ -385,7 +378,7 @@ def handle_server(server, number):
     while True:
         try:
             data = receiveData(server)
-            serverProtocol(data)
+            serverUnpack(data)
         # This exception handles client crashes and logouts
         except Exception as e:
             # Update leader after the server drops
@@ -561,12 +554,13 @@ def handle_client(client, server1, server2):
             break
 
 
-# receive() listens for client and server connections and starts new threads when found
+# receive() listens for client connections and starts new threads when found
 def receive():
     # When server starts
     print('Openning connection, running, and listening ...')
 
     while True:
+
         # Accepts new client on client connection
         client, address = myServer.accept()
         # Logs client connection information
@@ -630,8 +624,8 @@ if __name__ == "__main__":
     # attempt to connect to the three servers
     print("MY PORT IS ", PORT)
     if PORT == 12340:
-        socket1.connect((HOST, 12341))
-        socket2.connect((HOST, 12342))
+        socket1.connect((HOST2, 12341))
+        socket2.connect((HOST2, 12342))
     elif PORT == 12341:
         socket1.connect((HOST, 12340))
         socket2.connect((HOST, 12342))

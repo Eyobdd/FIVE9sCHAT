@@ -27,6 +27,7 @@ def encoded_message(message):
 # Defined header length throughout wire protocol
 HEADER_LENGTH = 10
 HOST = '10.250.209.143'
+HOST2 = '10.250.92.212'
 
 # Create a socket and connect to the server
 client1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -267,24 +268,23 @@ try:
 
 
             
-
+    # USER IS NOW AUTHENTICATED
+    # Open up thread to send and receive messages from server
     receive_thread1 = threading.Thread(target=client_receive, args=[client1])
     receive_thread1.start()
 
     send_thread1 = threading.Thread(target=client_send, args= [client1, 1])
     send_thread1.start()
 
-    # DETECTED DROP IN SERVER 1
     while receive_thread1.is_alive() or send_thread1.is_alive():
         x = 3
     
     server2GoesThrough = True
-
-    # TRY TO CONNECT TO SERVER 2
     try:
 
+    # prob need a try here later
         client2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client2.connect((HOST, 12341))
+        client2.connect((HOST2, 12341))
         request_message = f"L:{username}"
         request_message = encoded_message(request_message)
         client2.send(request_message)
@@ -305,11 +305,8 @@ try:
         while receive_thread2.is_alive() or send_thread2.is_alive():
             x = 3
 
-    # SERVER 2 HAS BEEN DROPPED OR NOT ABLE TO CONNECT
-
-    # CONNECT TO SERVER 3
     client3 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client3.connect((HOST, 12342))
+    client3.connect((HOST2, 12342))
     request_message = f"L:{username}"
     request_message = encoded_message(request_message)
     client3.send(request_message)

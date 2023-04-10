@@ -27,7 +27,7 @@ class Message:
         print("sender: ", self.sender)
         print("recipient: ", self.recipient)
         print("message: ", self.data)
-        
+    
     # Creates a Message() object from buffer
     @staticmethod
     def createMessageFromBuffer(header):
@@ -37,3 +37,22 @@ class Message:
         recipient = header[2]
         data = header[3]
         return Message(sender, recipient, data)
+    
+    @staticmethod 
+    def equals(Message1, Message2):
+        m1sender = Message1.sender
+        m1recipient = Message1.recipient
+        m1data = Message1.data
+
+        m2sender = Message2.sender
+        m2recipient = Message2.recipient
+        m2data = Message2.data
+
+        if m1sender != m2sender:
+            return False
+        if m1recipient != m2recipient:
+            return False
+        if m1data != m1data:
+            return False
+        return True
+

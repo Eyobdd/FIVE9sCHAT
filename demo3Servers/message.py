@@ -19,7 +19,15 @@ class Message:
         header = f"{len(encoded_message) :< {HEADER_LENGTH}}".encode('utf-8')
 
         return header+encoded_message
+    def encodeJustMessage(self):
+        encoded_message = f"M:{self.recipient}:{self.sender}:{self.data}".encode('utf-8')
+        return encoded_message
     
+    def print(self):
+        print("sender: ", self.sender)
+        print("recipient: ", self.recipient)
+        print("message: ", self.data)
+        
     # Creates a Message() object from buffer
     @staticmethod
     def createMessageFromBuffer(header):

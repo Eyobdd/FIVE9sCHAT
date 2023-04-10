@@ -226,6 +226,7 @@ try:
 
             # Any general errors are caught here
             except Exception as e:
+
                 print(bcolors.WARNING +'Error! '+ str(e) + bcolors.ENDC)
                 client.close()
                 break       

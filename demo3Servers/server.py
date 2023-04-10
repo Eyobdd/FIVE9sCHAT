@@ -7,6 +7,21 @@ from command import Command
 import time
 
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+
+socket1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+socket2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
 
 # Constants
 print("order")
@@ -15,13 +30,10 @@ HOST = '10.250.209.143'
 PORT = int(sys.argv[1])
 
 # Connect sockets to server
-server1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server1.bind((HOST, PORT))
-server1.listen()
+myServer = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+myServer.bind((HOST, PORT))
+myServer.listen()
 
-server2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server2.bind((HOST, PORT-5))
-server2.listen()
 
 ports = [12340, 12341, 12342]
 serverActives = [0,0,0]
@@ -36,6 +48,8 @@ clients = []
 # Stores active usernames
 usernames = [] 
 
+# Stores server connections
+servers = []
 
 # Stores all active users {username:socket} pairs
 clientID = {}
@@ -46,9 +60,15 @@ loginStatus = {}
 # The server is always online so users cannot log into the server account
 loginStatus['SERVER'] = True
 
+
 # Stores all messages to offline users {username: Message()}
 queuedMessages = {}
 
+
+def encoded_message(message):
+    message = message.encode('utf-8')
+    header = f"{len(message) :< {HEADER_LENGTH}}".encode('utf-8')
+    return header+message
 
 # Function sends encoded message to username
 def sendToClient(username, message):
@@ -68,6 +88,34 @@ def receiveData(client):
     data_length = int(data.strip())
     data = client.recv(data_length).decode('utf-8')
     return data
+
+def receiveDataServer(server):
+    data = server.recv(1024).decode('utf-8')
+    data_length = int(data.strip())
+    data = server.recv(data_length).decode('utf-8')
+    return data
+
+def serverUnpack(data):
+    print(data)
+    dataSplit = data.split(":")
+    if dataSplit[0] == "M":
+        # we have a message -- add it to the queued messages
+        m = Message.createMessageFromBuffer(data)
+        m.print()
+        queuedMessages[m.recipient].append(m)
+        print("QUEUED messages are: ", queuedMessages)
+    if dataSplit[0] == "C":
+        username = dataSplit[1]
+        loginStatus[username] = False
+        queuedMessages[username] = []
+        print("usernames: ", loginStatus)
+    if dataSplit[0] == "D":
+        username = dataSplit[1]
+        del loginStatus[username]
+        del queuedMessages[username]
+        print("ACCOUNT: " + username + " has been attempted to be deleted")
+        print("usernames: ", loginStatus)
+        print("QUEUED messages are: ", queuedMessages)
 
 # Protocol action handles all actions by the server according to our Protocol
 # Input is either a Message() or Command() object
@@ -118,7 +166,10 @@ def protocol_action(obj):
             # success = Message(obj.username, "SERVER", success)
             # sendToClient(obj.username, success.encode())
             sendToClient(obj.username,"Account-Successfully-Deleted")
-
+            message = "D:" + obj.username
+            message = encoded_message(message)
+            socket1.send(message)
+            socket2.send(message)
 
             # Remove user from loginStatus and clientID list
             del loginStatus[obj.username]
@@ -215,6 +266,7 @@ def findLeader():
         return 2
     elif serverActives[2] == 1:
         return 3 
+
 def handle_server(server, number):
     # if server 1 is connecting to you, then set its activity status to True
     serverActives[number - 1] = 1
@@ -231,10 +283,10 @@ def handle_server(server, number):
     while True:
         try:
             data = receiveData(server)
-            print(data)
+            serverUnpack(data)
         # This exception handles client crashes and logouts
-        except:
-
+        except Exception as e:
+            print(bcolors.WARNING +'Error! '+ str(e) + bcolors.ENDC)
             # Update leader after the server drops
             serverActives[number - 1] = 0
             leader = findLeader()
@@ -243,9 +295,10 @@ def handle_server(server, number):
             return
 
 # Server thread to handle client <-> server communications
-def handle_client(client):
+def handle_client(client, server1, server2):
 
     # Displays All accounts and statuses when the client connects
+
 
     ## Generate account list
     allAccounts = 'LA|'
@@ -307,6 +360,13 @@ def handle_client(client):
                 clients.append(client)
                 clientID[username] = client
                 loginStatus[username] = True
+                message = "C:" + username
+                message = encoded_message(message)
+                socket1.send(message)
+                socket2.send(message)
+
+                # log message as well
+
 
                 sendToClient(username,"Successful-Account-Creation.")
 
@@ -348,11 +408,13 @@ def handle_client(client):
     # Receives buffers from client and applies wire protocol
     while True:
         try:
-            
 
             # Applies wire protocol to buffer -> returns a Message() or Command() objects
             obj = protocol_unpack(client)
+            if isinstance(obj, Message):
 
+                socket1.send(obj.encode())
+                socket2.send(obj.encode())
             # Applies an action to the object
             protocol_action(obj)
 
@@ -386,29 +448,32 @@ def receive():
     while True:
 
         # Accepts new client on client connection
-        client, address = server1.accept()
+        client, address = myServer.accept()
         # Logs client connection information
         print(f'connection is established with: {str(address)}')
         connection = ''
         if str(address[1]) == '12349' or str(address[1]) == '12346':
             connection = "SERVER1"
             # Open up receivng thread with Server 1
+            servers.append(client)
             thread = threading.Thread(target=handle_server, args=(client,1))
             thread.start()
         elif str(address[1]) == '12350' or str(address[1]) == '12347':
             connection = "SERVER2"
             # Open up receiving thread with Server 2
+            servers.append(client)
             thread = threading.Thread(target=handle_server, args=(client,2))
             thread.start()
         elif str(address[1]) == '12351' or str(address[1]) == '12348':
             connection = "SERVER3"
             # Open up receiving thread with Server 3
+            servers.append(client)
             thread = threading.Thread(target=handle_server, args=(client,3))
             thread.start()
         else:
             # Open up a receiving thread with the client
             connection = "CLIENT"
-            thread = threading.Thread(target=handle_client, args=(client,))
+            thread = threading.Thread(target=handle_client, args=(client, servers[0], servers[1]))
             thread.start()
         
         print((f'connection is established with :{connection}'))
@@ -433,13 +498,12 @@ def onConnection(username):
             # Sends encoded message to that user
             client.send(message.encode())
 
-            queuedMessages[username].remove(message)
+            # commenting to send all of the chat history
+            #queuedMessages[username].remove(message)
 
 if __name__ == "__main__":
 
     time.sleep(4)
-    socket1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    socket2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     socket1.bind((HOST, PORT + 6))
     socket2.bind((HOST, PORT + 9))

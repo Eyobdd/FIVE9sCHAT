@@ -1,3 +1,8 @@
+####################################################################################################
+# FOR DEMO PURPOSES ONLY == WE MAINLY CHANGED THE HOSTs/PORTs TO CONNECT TO TWO MACHINES.
+####################################################################################################
+
+
 import threading
 import socket
 import sys
@@ -33,15 +38,12 @@ PORT = int(sys.argv[1])
 # UNIT TEST Init
 chat3SimHist = "(UNIT_TESTS)persistenceTestChats/12342UNITTESTchatHistory.pickle"
 UNITTESTVERIFY = {}
+TESTING_PERSISTENCE = False
 with open(chat3SimHist, 'rb') as handle:
         UNITTESTVERIFY = pickle.load(handle)
 if sys.argv[2] == "1":
     print("we will be running Unit tests")
     TESTING_PERSISTENCE = True
-else:
-    print("we will not be running Unit tests")
-    print("argv is " + sys.argv)
-    TESTING_PERSISTENCE = False
 
 # Connect sockets to server
 myServer = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

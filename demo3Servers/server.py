@@ -29,6 +29,7 @@ HOST = '10.250.209.143'
 PORT = int(sys.argv[1])
 
 # UNIT TEST Init
+TESTING_PERSISTENCE = False
 chat3SimHist = "(UNIT_TESTS)persistenceTestChats/12342UNITTESTchatHistory.pickle"
 UNITTESTVERIFY = {}
 with open(chat3SimHist, 'rb') as handle:
@@ -36,10 +37,7 @@ with open(chat3SimHist, 'rb') as handle:
 if sys.argv[2] == "1":
     print("we will be running Unit tests")
     TESTING_PERSISTENCE = True
-else:
-    print("we will not be running Unit tests")
-    print("argv is " + sys.argv)
-    TESTING_PERSISTENCE = False
+
 
 # Connect sockets to server
 myServer = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -329,7 +327,7 @@ def broadcast(message):
         sendToClient(username,message)
 
 # Finds most recent active server (in the order of server 1,2,3)
-def findLeader():
+def find_leader():
     if serverActives[0] == 1:
         return 1
     elif serverActives[1] == 1:
@@ -346,7 +344,7 @@ def handle_server(server, number):
     serverActives[number - 1] = 1
     
     # See if you need to change leadership
-    leader = findLeader()
+    leader = find_leader()
     print("LEADER IS SERVER", leader)
 
     # Synchronize queued messages across servers
@@ -390,7 +388,7 @@ def handle_server(server, number):
         except Exception as e:
             # Update leader after the server drops
             serverActives[number - 1] = 0
-            leader = findLeader()
+            leader = find_leader()
             print(bcolors.WARNING + "LEADER IS NOW: "  + str(leader) + bcolors.ENDC )
             server.close()
             return

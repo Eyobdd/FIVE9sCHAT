@@ -1,3 +1,7 @@
+####################################################################################################
+# FOR DEMO PURPOSES ONLY == WE MAINLY CHANGED THE HOSTs/PORTs TO CONNECT TO TWO MACHINES.
+####################################################################################################
+
 # Import modules used
 import sys
 import threading
@@ -303,7 +307,7 @@ try:
     
     if server2GoesThrough:
         while receive_thread2.is_alive() or send_thread2.is_alive():
-            x = 3
+            x = 4
 
     client3 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client3.connect((HOST2, 12342))

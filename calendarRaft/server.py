@@ -38,7 +38,7 @@ if PORT == 12340:
 if PORT == 12341:
     heartbeat = 0.4
 if PORT == 12342:
-    heartbeat = 1
+    heartbeat = 1.5
 
 serverDrops = 0
 voted = False
@@ -46,6 +46,7 @@ votes = 0
 startedHeartBeat = False
 stopwatch = time.perf_counter()
 term = 0
+precedingEntry = "P:SERVER:INIT:1:1:1:"
 # number of servers
 N = 3
 
@@ -184,7 +185,7 @@ def startHeartBeat():
             time.sleep(heartbeat)
             sendHeartBeat()
 
-def sendVoteResponse(response, p):
+def sendResponseToOneServer(response, p):
         if ME == 0:
             if p == 12341:
                 socket1.send(response)
@@ -246,6 +247,7 @@ def serverProtocol(data):
     global votes
     global voted
     global leader
+    global precedingEntry
     resetHeartBeat()
     dataSplit = data.split(":")
     if dataSplit[0] == "M":
@@ -308,13 +310,13 @@ def serverProtocol(data):
             print("accepted vote for ", p)
             response = "VA:" + str(PORT)
             response = encoded_message(response)
-            sendVoteResponse(response, p)
+            sendResponseToOneServer(response, p)
         else:
 
             print("rejected vote for ", p)
             response = "VR:"
             response = encoded_message(response)
-            sendVoteResponse(response, p)
+            sendResponseToOneServer(response, p)
         voted = True
     elif dataSplit[0] == "VA":
         print("recieved an acceptance from", dataSplit[1])
@@ -322,9 +324,61 @@ def serverProtocol(data):
         if (1 + votes) >= (N+1)/2 and (state == "C"):
             #majority votes. Become Leader.
             state = "L"
-            print(bcolors.BOLD + bcolors.WARNING + "I AM TRUEST LEADER." + bcolors.ENDC)
+            print(bcolors.BOLD + bcolors.WARNING + "I AM LEADER." + bcolors.ENDC)
+    # Calendar logic
+
+    # AppendEntries RPC from leader server
+    elif dataSplit[0] == "PC":
+        print("recieved  a PC message from LEADER.")
+
+        pEntry = dataSplit[2] + ":" + dataSplit[3] + ":" + dataSplit[4] + ":" + dataSplit[5] + ":" + dataSplit[6] + ":" + dataSplit[7] + ":"
+        t = dataSplit[1]
+        commitMessage = dataSplit[8] + ":" + dataSplit[9] + ":" + dataSplit[10] + ":" + dataSplit[11] + ":" + dataSplit[12] + ":" + dataSplit[13]
+        p = dataSplit[14]
+
+        print("proposal pEntry", pEntry)
+        print("proposal commitMessage", commitMessage)
+        print("proposal p", p)
+        print("proposal term", t)
+        # Check if terms are the same and that preceding logs match
+
+   
+        print("prec is ", precedingEntry)
+        print("term is ", t)
+
+        if (t == str(term)) and (pEntry == precedingEntry):
+            print("I ACKNOLEDGE PROPOSED COMMAND FROM LEADER. AND Im going to send it to: ", p)
+            response = "A:" + commitMessage 
+            response = encoded_message(response)
+        # send an acknoledgement back to server saying that we approve
+
+            if PORT == 12342:
+                socket1.send(response)
+            if PORT == 12340:
+                socket1.send(response)
+        else:
+            print("t is" + str(t) + " and term is " + str(term))
+        
+    elif dataSplit[0] == "A":
+
+        # WE received an acknoledgement for at least one server (this is the majority for N=3 and N=2)
+        
+        print("RECEIVED ACKNOLEDGEMENT FROM MAJORITY FOLLOWERS.")
+        #send a commit message to the other servers
+        message = data.split(":", 1)
+        message = message[1]
+        message = encoded_message(message)
+        sendToServers(message)
 
 
+    elif dataSplit[0] == "CE":
+        obj = Event.createEventFromBuffer(data)
+        try:
+            calendar[obj.date].append(obj)
+        except Exception as error:
+            calendar[obj.date] = []
+            calendar[obj.date].append(obj)
+        print("COMMIT VERIFIED FROM LEADER. UPDATED REPLICANT CALENDAR, ", calendar)
 
 
 def protocol_action(obj):
@@ -440,7 +494,14 @@ def protocol_action(obj):
         except Exception as error:
             calendar[obj.date] = []
             calendar[obj.date].append(obj)
-        
+        message = f"CE:{obj.username}:{obj.title}:{obj.date}:{obj.start_time}:{obj.end_time}"
+
+        # Add preceding entry to new commit message
+        message = "PC:" + str(term) + ":" + precedingEntry + message + ":" + str(PORT)
+        print("the PC message is ", message)
+        message = encoded_message(message)
+        sendToServers(message)
+
         sendToClient(obj.username, "Event-Created")
         for event in calendar[obj.date]:
             if obj.overlapping(event.start_time,event.end_time):
@@ -568,6 +629,7 @@ def handle_server(server, number):
             serverProtocol(data)
         # This exception handles client crashes and logouts
         except Exception as e:
+            print("server dropped bc ", e)
             serverDrops += 1
             print(bcolors.WARNING + "NUMBER OF SERVERDROPS " + str(serverDrops) + bcolors.ENDC)
             if serverDrops > 1:

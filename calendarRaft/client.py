@@ -5,6 +5,7 @@ import socket
 import os
 import signal
 from message import Message
+from datetime import datetime
 
 # Constants used in text styling
 class bcolors:
@@ -82,6 +83,14 @@ def client_receive(connection):
                 elif data.data == "Account-Does-Not-Exist":
                     print(bcolors.FAIL + data.data + bcolors.ENDC)
 
+                # If SERVER creates an event
+                elif data.data == "Event-Created":
+                    print(bcolors.OKBLUE + data.data + bcolors.ENDC)
+                
+                # If SERVER deletes an event
+                elif data.data == "Event-Deleted":
+                    print(bcolors.OKBLUE + data.data + bcolors.ENDC)
+
                 # If SERVER is sending a broadcast message
                 else:
                     print(bcolors.OKCYAN + "[" + data.sender + "] " + bcolors.ENDC + data.data)
@@ -98,7 +107,6 @@ def client_receive(connection):
             connection.close()
             SERVERSTATE = 10
             sys.exit()
-
 
 # Thread that sends authenticated communication to the server
 def client_send(connection, state):
@@ -117,6 +125,80 @@ def client_send(connection, state):
 
             # If input is not a message
             if "->" not in inp:
+
+                if inp == "DE":
+
+                    title = ''
+                    validNum = False
+                    while title == '':
+                        title = input("Event Title: ")
+                        title = title.strip()
+                    
+                    while not validNum:
+                        try:
+                            day = input("Enter the event date (YYYY-MM-DD): ")
+                            day = day.strip()
+                            date = datetime.strptime(day, "%Y-%m-%d")
+                            day = date.timetuple().tm_yday
+                            validNum = True
+                        except:
+                            continue
+
+                    print("Username: "+ username +" | Title: "+title+" | Day:"+ str(day))
+
+                    message = f"DE:{username}:{title}:{day}"
+                    message = encoded_message(message)
+                    connection.send(message)
+                        
+
+                if inp == "CE":
+                    title = ''
+                    day = ''
+                    validNum = False
+
+                    while title.strip() == '':
+                        title = input("Event Title: ")
+
+                    while not validNum:
+                        try:
+                            day = input("Enter a date (YYYY-MM-DD): ")
+                            date_str = day.strip()
+                            date = datetime.strptime(date_str, "%Y-%m-%d")
+                            day = date.timetuple().tm_yday
+
+                            validNum = True
+                        except Exception as error:
+                            print("something went wrong...", error)
+                            continue
+                    
+                    validNum = False
+
+                    while not validNum:
+                        try:
+                            start_time = input("Enter a start time in 24H-time (HH:MM): ")
+                            hours, minutes = map(int, start_time.split(':'))
+                            start_time = hours * 60 + minutes
+                            if start_time < 60*24:
+                                validNum = True
+                            else:
+                                print("Enter a start time on the same day")
+                        except:
+                            continue
+                    
+                    validNum = False
+
+                    while not validNum:
+                        try:
+                            end_time = input("How long is this event? (in minutes): ")
+                            end_time = start_time + int(end_time.strip())
+                            validNum = True
+                        except:
+                            continue
+                        
+
+                    message = f"CE:{username}:{title}:{day}:{start_time}:{end_time}"
+                    message = encoded_message(message)
+                    connection.send(message)
 
                 # Check if it List Accounts request
                 if inp == "LA":

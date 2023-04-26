@@ -7,6 +7,7 @@ import time
 import pickle
 import os
 from datetime import datetime
+from event import Event
 
 class bcolors:
     HEADER = '\033[95m'
@@ -95,6 +96,9 @@ leader = ''
 # Stores all messages to offline users {username: Message()}
 queuedMessages = {}
 queueCounter = 0
+
+# Stores all events {username: Events} pairs
+calendar = {}
 
 # Load queued messages (different case if we are unit testing)
 if (TESTING_PERSISTENCE):
@@ -243,7 +247,6 @@ def serverProtocol(data):
     global voted
     global leader
     resetHeartBeat()
-    print(data)
     dataSplit = data.split(":")
     if dataSplit[0] == "M":
         # we have a message -- add it to the queued messages
@@ -413,6 +416,36 @@ def protocol_action(obj):
             # sendToClient(obj.username, allAccounts.encode())
             sendToClient(obj.username, allAccounts)
 
+        elif obj.actionType == "DE":
+
+            print("calendar before", calendar)
+            title = obj.data.title
+            day = obj.data.date
+
+            try:
+                for event in calendar[day]:
+                    if event.title == title:
+                        calendar[day].remove(event)
+            except Exception as e:
+                print(" so we're trying to delete an event, but an error", e)
+            
+            print("calendar after", calendar)
+            sendToClient(obj.username,"Event-Deleted")
+    if isinstance(obj, Event):
+        
+        print("EVENT OBJECT:",obj.username)
+        # Does this startTime have overlapping events
+        try:
+            calendar[obj.date].append(obj)
+        except Exception as error:
+            calendar[obj.date] = []
+            calendar[obj.date].append(obj)
+        
+        sendToClient(obj.username, "Event-Created")
+        for event in calendar[obj.date]:
+            if obj.overlapping(event.start_time,event.end_time):
+                sendToClient(obj.username, "Over-Lapping-Event")
+
 
 # Protocol unpack returns Message() and Command() from protocol buffers
 # Takes a client socket and encoded buffer data
@@ -431,6 +464,24 @@ def protocol_unpack(client):
 
         # Return Message()
         return Message.createMessageFromBuffer(data)
+
+    if type_ == "CE":
+        e = Event.createEventFromBuffer(data)
+        print("E is ", e)
+        return e
+
+    if type_ == "DE":
+
+        print("receiving a delete action (unpack)")
+        username = dataSplit[1]
+        title = dataSplit[2]
+        day = dataSplit[3]
+        start_time = "0"
+        end_time = "0"
+        
+        e = Event(username, title, day, start_time, end_time)
+        return Command.createCommandFromBuffer(client, e, username, type_)
+
 
     # If type is LA -> create and return Command() object
     elif type_ == "LA":

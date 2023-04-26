@@ -39,6 +39,9 @@ SERVERSTATE = 1
 auth = False
 username = ''
 
+
+
+
 try:
     # Retrieves list from server of all existing accounts
     header = client1.recv(HEADER_LENGTH).decode('utf-8').strip()

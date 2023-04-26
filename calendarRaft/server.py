@@ -29,15 +29,17 @@ HOST = '127.0.0.1'
 PORT = int(sys.argv[1])
 
 
+
 # RAFT vars
 state = "F"
 if PORT == 12340:
-    heartbeat = 0.3
+    heartbeat = 1
 if PORT == 12341:
     heartbeat = 0.4
 if PORT == 12342:
-    heartbeat = 0.2
+    heartbeat = 1
 
+serverDrops = 0
 voted = False
 votes = 0
 startedHeartBeat = False
@@ -87,6 +89,8 @@ loginStatus = {}
 # The server is always online so users cannot log into the server account
 loginStatus['SERVER'] = True
 
+# Will update this in our heart beat
+leader = ''
 
 # Stores all messages to offline users {username: Message()}
 queuedMessages = {}
@@ -138,7 +142,7 @@ def resetHeartBeat():
 
 def sendHeartBeat():
     global term
-    message = "E: " + str(term)
+    message = "E: " + str(term) + ":" + str(PORT)
     message = encoded_message(message)
     sendToServers(message)
 
@@ -158,7 +162,13 @@ def startHeartBeat():
     global state
     resetHeartBeat()
     while True:
+
+        if serverDrops > 1:
+                state = "L"
+
         if state == "F":
+            if serverDrops > 1:
+                state = "L"
             t = getTime()
             if t > heartbeat:
                 print(bcolors.WARNING + "HEARTBEAT" + bcolors.ENDC + str(t))
@@ -231,6 +241,7 @@ def serverProtocol(data):
     global term
     global votes
     global voted
+    global leader
     resetHeartBeat()
     print(data)
     dataSplit = data.split(":")
@@ -272,11 +283,13 @@ def serverProtocol(data):
                 pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
     elif dataSplit[0] == "E":
         t = int(dataSplit[1])
+        p = int(dataSplit[2])
         state = "F"
         voted = False
         votes = 0
         if t > term:
             term = t
+        leader = p
         resetHeartBeat()
     elif dataSplit[0] == "RV":
         # We recieved a request for a vote
@@ -306,7 +319,7 @@ def serverProtocol(data):
         if (1 + votes) >= (N+1)/2 and (state == "C"):
             #majority votes. Become Leader.
             state = "L"
-            print(bcolors.BOLD + bcolors.WARNING + "I AM TRUE LEADER." + bcolors.ENDC)
+            print(bcolors.BOLD + bcolors.WARNING + "I AM TRUEST LEADER." + bcolors.ENDC)
 
 
 
@@ -361,7 +374,7 @@ def protocol_action(obj):
             message = "D:" + obj.username
             message = encoded_message(message)
             sendToServers(message)
-           
+            
 
             # Remove user from loginStatus and clientID list
             del loginStatus[obj.username]
@@ -456,7 +469,8 @@ def broadcast(message):
 def handle_server(server, number):
     global queuedMessages
     global queueCounter
-
+    global serverDrops
+    global state
     # Set the server's activity as online (since it is connecting to you).
     serverActives[number - 1] = 1
     
@@ -503,16 +517,17 @@ def handle_server(server, number):
             serverProtocol(data)
         # This exception handles client crashes and logouts
         except Exception as e:
-            # Update leader after the server drops
+            serverDrops += 1
+            print(bcolors.WARNING + "NUMBER OF SERVERDROPS " + str(serverDrops) + bcolors.ENDC)
+            if serverDrops > 1:
+                state = "L"
+            
             serverActives[number - 1] = 0
             server.close()
             return
 
 # Server thread to handle client <-> server communications
 def handle_client(client, server1, server2):
-
-    # Displays All accounts and statuses when the client connects
-
 
     ## Generate account list
     allAccounts = 'LA|'
@@ -677,6 +692,10 @@ def handle_client(client, server1, server2):
 # receive() listens for client and server connections and starts new threads when found
 def receive():
     global queueCounter
+    global leader
+    global state
+    # If not a leader -- close connection with client and respond with the leader.
+
     # When server starts
     print('Openning connection, running, and listening ...')
     
@@ -684,7 +703,6 @@ def receive():
         # Accepts new client on client connection
         client, address = myServer.accept()
         # Logs client connection information
-        print(f'connection is established with: {str(address)}')
         connection = ''
         if str(address[1]) == '12349' or str(address[1]) == '12346':
             connection = "SERVER1"
@@ -707,13 +725,23 @@ def receive():
         else:
             # Open up a receiving thread with the client
             connection = "CLIENT"
-            thread = threading.Thread(target=handle_client, args=(client, servers[0], servers[1]))
-            thread.start()
+            if state == "F" or state == "C":
+                print(bcolors.WARNING + "I AM A FOLLOWER/CANDIDATE AND A CLIENT ATTEMPTED TO CONNECT." + bcolors.ENDC)
+                message = "WL:" + str(leader)
+                message = Message(" ", "SERVER", message)
+                message = message.encode()
+                client.send(message)
+                client.close()
+            else:
+                print("ACCPETING A CONNECTION FROM A CLIENT B/C I AM STATE: ", state)
+                thread = threading.Thread(target=handle_client, args=(client, servers[0], servers[1]))
+                thread.start()
         
         if not startedHeartBeat and (queueCounter > 1):
             thread = threading.Thread(target=startHeartBeat)
             thread.start()
-        print((f'connection is established with :{connection}'))
+        
+        print((f'connection is established with: {connection}'))
 
 
 

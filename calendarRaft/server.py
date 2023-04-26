@@ -99,7 +99,14 @@ queuedMessages = {}
 queueCounter = 0
 
 # Stores all events {username: Events} pairs
+
+
 calendar = {}
+cfilename = str(PORT) + "calendar.pickle"
+if os.path.isfile(cfilename):
+    with open(cfilename, 'rb') as handle:
+        calendar = pickle.load(handle)
+
 
 # Load queued messages (different case if we are unit testing)
 if (TESTING_PERSISTENCE):
@@ -115,7 +122,7 @@ else:
     queuedMessages = {}
 
 # Convert queued messages into a structure we can send over the sockets.
-pickleMessage = pickle.dumps(queuedMessages)
+pickleMessage = pickle.dumps(calendar)
 
  # Make the server active.
 loginStatus['SERVER'] = True
@@ -201,6 +208,12 @@ def sendResponseToOneServer(response, p):
                 socket1.send(response)
             else:
                 socket2.send(response)
+
+def eventAlreadyExists(day, title):
+    for event in calendar[day]:
+        if event.title == title:
+            return True
+    return False
 
 # Equality checking of message logs -- used for unit tests
 def messageLogEquals(d1, d2):
@@ -302,8 +315,6 @@ def serverProtocol(data):
         t = int(dataSplit[1])
         p = int(dataSplit[2])
 
-        print("term", t)
-        print("port", p)
         if (not (term > t)) and (not voted):
             # Accept vote and send acceptance
 
@@ -329,35 +340,26 @@ def serverProtocol(data):
 
     # AppendEntries RPC from leader server
     elif dataSplit[0] == "PC":
-        print("recieved  a PC message from LEADER.")
 
-        pEntry = dataSplit[2] + ":" + dataSplit[3] + ":" + dataSplit[4] + ":" + dataSplit[5] + ":" + dataSplit[6] + ":" + dataSplit[7] + ":"
-        t = dataSplit[1]
-        commitMessage = dataSplit[8] + ":" + dataSplit[9] + ":" + dataSplit[10] + ":" + dataSplit[11] + ":" + dataSplit[12] + ":" + dataSplit[13]
-        p = dataSplit[14]
-
-        print("proposal pEntry", pEntry)
-        print("proposal commitMessage", commitMessage)
-        print("proposal p", p)
-        print("proposal term", t)
+        if dataSplit[8] == "CE":
+            pEntry = dataSplit[2] + ":" + dataSplit[3] + ":" + dataSplit[4] + ":" + dataSplit[5] + ":" + dataSplit[6] + ":" + dataSplit[7] + ":"
+            t = dataSplit[1]
+            commitMessage = dataSplit[8] + ":" + dataSplit[9] + ":" + dataSplit[10] + ":" + dataSplit[11] + ":" + dataSplit[12] + ":" + dataSplit[13]
+            p = dataSplit[14]
+        
+        if dataSplit[8] == "DE":
         # Check if terms are the same and that preceding logs match
-
-   
-        print("prec is ", precedingEntry)
-        print("term is ", t)
+            pEntry = dataSplit[2] + ":" + dataSplit[3] + ":" + dataSplit[4] + ":" + dataSplit[5] + ":" + dataSplit[6] + ":" + dataSplit[7] + ":"
+            t = dataSplit[1]
+            commitMessage = dataSplit[8] + ":" + dataSplit[9] + ":" + dataSplit[10] + ":" + dataSplit[11]
+            p = dataSplit[12]
 
         if (t == str(term)) and (pEntry == precedingEntry):
             print("I ACKNOLEDGE PROPOSED COMMAND FROM LEADER. AND Im going to send it to: ", p)
             response = "A:" + commitMessage 
             response = encoded_message(response)
         # send an acknoledgement back to server saying that we approve
-
-            if PORT == 12342:
-                socket1.send(response)
-            if PORT == 12340:
-                socket1.send(response)
-        else:
-            print("t is" + str(t) + " and term is " + str(term))
+            sendResponseToOneServer(response, int(p))
         
     elif dataSplit[0] == "A":
 
@@ -374,13 +376,30 @@ def serverProtocol(data):
     elif dataSplit[0] == "CE":
         obj = Event.createEventFromBuffer(data)
         try:
-            calendar[obj.date].append(obj)
+            if not (eventAlreadyExists(obj.date, obj.title)):
+                calendar[obj.date].append(obj)
         except Exception as error:
+            print(error)
             calendar[obj.date] = []
-            calendar[obj.date].append(obj)
+            if not (eventAlreadyExists(obj.date, obj.title)):
+                calendar[obj.date].append(obj)
         print("COMMIT VERIFIED FROM LEADER. UPDATED REPLICANT CALENDAR, ", calendar)
-
-
+        with open(cfilename, 'wb') as handle:
+                    pickle.dump(calendar, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    elif dataSplit[0] == "DE":
+        username = dataSplit[1]
+        title = dataSplit[2]
+        day = dataSplit[3]
+        print("calendar before: ", calendar)
+        try:
+            for event in calendar[day]:
+                if event.title == title:
+                    calendar[day].remove(event)
+        except Exception as e:
+            print(" so we're trying to delete an event, but an error", e)
+        print("COMMIT VERIFIED FROM LEADER. UPDATED REPLICANT CALENDAR, ", calendar)
+        with open(cfilename, 'wb') as handle:
+                    pickle.dump(calendar, handle, protocol=pickle.HIGHEST_PROTOCOL)
 def protocol_action(obj):
 
     # If the object is a Message() then we try to send the message
@@ -472,7 +491,7 @@ def protocol_action(obj):
 
         elif obj.actionType == "DE":
 
-            print("calendar before", calendar)
+            print("calendar beforeee", calendar)
             title = obj.data.title
             day = obj.data.date
 
@@ -483,29 +502,43 @@ def protocol_action(obj):
             except Exception as e:
                 print(" so we're trying to delete an event, but an error", e)
             
-            print("calendar after", calendar)
+            print("calendar after!!!!", calendar)
+            message = f"DE:{obj.data.username}:{obj.data.title}:{obj.data.date}"
+            
+        # Add preceding entry to new commit message
+            if serverDrops < 2:
+                message = "PC:" + str(term) + ":" + precedingEntry + message + ":" + str(PORT)
+                print("the PC message is ", message)
+                message = encoded_message(message)
+                sendToServers(message)
+
+            with open(cfilename, 'wb') as handle:
+                    pickle.dump(calendar, handle, protocol=pickle.HIGHEST_PROTOCOL)
             sendToClient(obj.username,"Event-Deleted")
     if isinstance(obj, Event):
         
-        print("EVENT OBJECT:",obj.username)
         # Does this startTime have overlapping events
         try:
-            calendar[obj.date].append(obj)
+            if not (eventAlreadyExists(obj.date, obj.title)):
+                calendar[obj.date].append(obj)
         except Exception as error:
             calendar[obj.date] = []
-            calendar[obj.date].append(obj)
+            if not (eventAlreadyExists(obj.date, obj.title)):
+                calendar[obj.date].append(obj)
+
         message = f"CE:{obj.username}:{obj.title}:{obj.date}:{obj.start_time}:{obj.end_time}"
 
         # Add preceding entry to new commit message
-        message = "PC:" + str(term) + ":" + precedingEntry + message + ":" + str(PORT)
-        print("the PC message is ", message)
-        message = encoded_message(message)
-        sendToServers(message)
+
+        if serverDrops < 2:
+            message = "PC:" + str(term) + ":" + precedingEntry + message + ":" + str(PORT)
+            print("the PC message is ", message)
+            message = encoded_message(message)
+            sendToServers(message)
 
         sendToClient(obj.username, "Event-Created")
-        for event in calendar[obj.date]:
-            if obj.overlapping(event.start_time,event.end_time):
-                sendToClient(obj.username, "Over-Lapping-Event")
+        with open(cfilename, 'wb') as handle:
+                    pickle.dump(calendar, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 # Protocol unpack returns Message() and Command() from protocol buffers
@@ -528,7 +561,6 @@ def protocol_unpack(client):
 
     if type_ == "CE":
         e = Event.createEventFromBuffer(data)
-        print("E is ", e)
         return e
 
     if type_ == "DE":
@@ -561,7 +593,7 @@ def protocol_unpack(client):
 
         # Return Command() 
         return Command.createCommandFromBuffer(client, None ,username,type_)
-    
+
 # Function sends a message to all active accounts 
 def broadcast(message):
     
@@ -583,35 +615,34 @@ def handle_server(server, number):
     global queueCounter
     global serverDrops
     global state
+    global calendar
     # Set the server's activity as online (since it is connecting to you).
     serverActives[number - 1] = 1
     
     # See if you need to change leadership
 
     # Synchronize queued messages across servers
-    qProposal = server.recv(1024)
-    qProposal = pickle.loads(qProposal)
+    cProposal = server.recv(1024)
+    cProposal = pickle.loads(cProposal)
     proposalCount = 0
-    for x in qProposal:
-        if isinstance(qProposal[x], list):
-            proposalCount += len(qProposal[x])
+    for x in cProposal:
+        if isinstance(cProposal[x], list):
+            proposalCount += len(cProposal[x])
     localCount = 0
-    for i in queuedMessages:
-        if isinstance(queuedMessages[i], list):
-            localCount += len(queuedMessages[i])
+    for i in calendar:
+        if isinstance(calendar[i], list):
+            localCount += len(calendar[i])
 
-    print(bcolors.OKBLUE + "SYNCHRONIZING with SERVER" + str(number) + bcolors.ENDC)
     if proposalCount > localCount:
-        queuedMessages = qProposal
+        calendar = cProposal
     
     # Load user acconts from chat logs
     for username in queuedMessages.keys():
         loginStatus[username] = False
     
-    print(bcolors.OKBLUE + "<LOADED ACCOUNTS" + bcolors.ENDC)
+    print(bcolors.OKBLUE + "<LOADED CALENDARS" + bcolors.ENDC)
 
     queueCounter +=1
-
 
 
     # Unit test -- see if you synchronized to the right log.
@@ -661,11 +692,6 @@ def handle_client(client, server1, server2):
     # Remove the last "|" if accounts exists 
     if len(allAccounts) > len("LA|"):
         allAccounts = allAccounts[:-1]
-    
-    # Sends List of all account statuses to client 
-    message = f"M:_:SERVER:{allAccounts}".encode('utf-8')
-    header = f"{len(message) :< {HEADER_LENGTH}}".encode('utf-8')
-    client.send(header+message)
 
 
     ## Account Register/Login Loop
@@ -798,7 +824,7 @@ def handle_client(client, server1, server2):
                 loginStatus[username] = False
 
             # Broadcast to everyone that the client disconnected
-            broadcast(f'{username} has left the chat room!')
+            broadcast(f'{username} has left the calendar!')
             break
 
 
@@ -840,7 +866,7 @@ def receive():
             connection = "CLIENT"
             if state == "F" or state == "C":
                 print(bcolors.WARNING + "I AM A FOLLOWER/CANDIDATE AND A CLIENT ATTEMPTED TO CONNECT." + bcolors.ENDC)
-                message = "WL:" + str(leader)
+                message = "WL: Redirecting you to the leader on - " + str(leader)
                 message = Message(" ", "SERVER", message)
                 message = message.encode()
                 client.send(message)
@@ -863,7 +889,7 @@ def receive():
 def onConnection(username):
 
     # User connection broadcast
-    message = f'{username} has connected to the chat room'
+    message = f'{username} has connected to the calendar'
     broadcast(message)
 
     # Dequeing of stored user messages
@@ -886,7 +912,6 @@ if __name__ == "__main__":
     socket1.bind((HOST, PORT + 6))
     socket2.bind((HOST, PORT + 9))
     # attempt to connect to the three servers
-    print("MY PORT IS ", PORT)
     if PORT == 12340:
         socket1.connect((HOST, 12341))
         socket2.connect((HOST, 12342))

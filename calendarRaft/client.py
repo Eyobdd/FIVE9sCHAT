@@ -33,7 +33,7 @@ HOST = '127.0.0.1'
 
 
 auth = False
-username = 'Aneesh'
+username = sys.argv[1]
 
 
 

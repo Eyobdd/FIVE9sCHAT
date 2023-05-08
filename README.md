@@ -1,3 +1,7 @@
+
+
+
+
 # RAFTCal
 
 Welcome to RAFTCal!
@@ -21,6 +25,16 @@ This project implements a shared calendar that is persistent and 2-fault toleran
 - Python 3.x
 - customtkinter
 - tkcalendar
+
+## Installation
+
+To install all the dependencies required for this Python project, run the following command:
+
+```
+pip install -r requirements.txt
+```
+
+This command will install all the packages listed in the `requirements.txt` file. Make sure you are in the project directory before running this command.
 
 ## Usage
 

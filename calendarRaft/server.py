@@ -26,7 +26,7 @@ socket1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 socket2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 HEADER_LENGTH = 10
-HOST = '10.250.92.212'
+HOST = '127.0.0.1'
 # HOST = "127.0.0.1"
 PORT = int(sys.argv[1])
 
@@ -52,10 +52,10 @@ N = 3
 
 # UNIT TEST Init
 TESTING_PERSISTENCE = False
-chat3SimHist = "(UNIT_TESTS)persistenceTestChats/12342UNITTESTchatHistory.pickle"
-UNITTESTVERIFY = {}
-with open(chat3SimHist, 'rb') as handle:
-        UNITTESTVERIFY = pickle.load(handle)
+simData = "12341calendarLog.pickle"
+sim = {}
+with open(simData, 'rb') as handle:
+        sim = pickle.load(handle)
 if sys.argv[2] == "1":
     print("we will be running Unit tests")
     TESTING_PERSISTENCE = True
@@ -95,27 +95,25 @@ loginStatus['SERVER'] = True
 leader = ''
 
 # Stores all messages to offline users {username: Message()}
-queuedMessages = {}
 queueCounter = 0
 
 # Stores all events {username: Events} pairs
 calendar = {}
 
-# Load queued messages (different case if we are unit testing)
-if (TESTING_PERSISTENCE):
-    filename = "(UNIT_TESTS)persistenceTestChats/" + str(PORT) + "UNITTESTchatHistory.pickle"
-else:
-    filename = str(PORT) + "chatHistory.pickle"
+# Load calendar log (different case if we are unit testing)
+
+
+filename = str(PORT) + "calendarLog.pickle"
 if os.path.isfile(filename):
     with open(filename, 'rb') as handle:
-        queuedMessages = pickle.load(handle)
+        calendar = pickle.load(handle)
     if (TESTING_PERSISTENCE):
-        print(bcolors.BOLD + bcolors.OKCYAN + "UNIT TEST: Loads own chat history from disk ✅" + bcolors.ENDC)
+        print(bcolors.BOLD + bcolors.OKCYAN + "UNIT TEST: Loads own calendar log history from disk ✅" + bcolors.ENDC)
 else:
-    queuedMessages = {}
+    calendar = {}
 
 # Convert queued messages into a structure we can send over the sockets.
-pickleMessage = pickle.dumps(queuedMessages)
+pickleMessage = pickle.dumps(calendar)
 
  # Make the server active.
 loginStatus['SERVER'] = True
@@ -203,10 +201,10 @@ def sendVoteResponse(response, p):
                 socket2.send(response)
 
 # Equality checking of message logs -- used for unit tests
-def messageLogEquals(d1, d2):
-    for u in d1:
-        for i in range(len(d1[u])):
-            if not Message.equals(d1[u][i], d2[u][i]):
+def calendarLogEquals(d1, d2):
+    for u in d2:
+        for i in range(len(d2[u])):
+            if not d2[u][i] == d2[u][i]:
                 return False
     return True
     
@@ -253,38 +251,22 @@ def serverProtocol(data):
         # we have a message -- add it to the queued messages
         m = Message.createMessageFromBuffer(data)
         m.print()
-        queuedMessages[m.recipient].append(m)
-
-        # log
-        print("QUEUED messages are: ", queuedMessages)
-        with open(filename, 'wb') as handle:
-            pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     elif dataSplit[0] == "C":
 
         # account was created on a leader server -- we need to replicate it here
         username = dataSplit[1]
         loginStatus[username] = False
-        queuedMessages[username] = []
         print("usernames: ", loginStatus)
-
-        # log
-        with open(filename, 'wb') as handle:
-            pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     elif dataSplit[0] == "D":
         # account was deleted on a leader server -- we need to replicate it here
 
         username = dataSplit[1]
         del loginStatus[username]
-        del queuedMessages[username]
         print("ACCOUNT: " + username + " has been attempted to be deleted")
         print("usernames: ", loginStatus)
-        print("QUEUED messages are: ", queuedMessages)
 
-        #log
-        with open(filename, 'wb') as handle:
-                pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
     elif dataSplit[0] == "E":
         t = int(dataSplit[1])
         p = int(dataSplit[2])
@@ -351,9 +333,6 @@ def protocol_action(obj):
 
             sendToClient(obj.sender, f"{obj.recipient} is not logged in. But your message will be delivered")
 
-            if obj.recipient not in queuedMessages.keys():
-                queuedMessages[obj.recipient] = []
-            queuedMessages[obj.recipient].append(obj)
 
         # Else sends the message to recipient and delivery confirmation to sender
         elif (clientID[obj.recipient] in clients):
@@ -388,9 +367,7 @@ def protocol_action(obj):
             del clientID[obj.username]
 
             # Only delete from queued messages if user had queued messages. 
-            del queuedMessages[obj.username]
-            with open(filename, 'wb') as handle:
-                pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            
         # If Command type is LA -> Lists all stored accounts with their login status
         
         elif obj.actionType == "L":
@@ -504,6 +481,11 @@ def protocol_action(obj):
             calendar[obj.date] = []
             calendar[obj.date].append(obj)
         
+        # log
+        with open(filename, 'wb') as handle:
+            pickle.dump(calendar, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
         sendToClient(obj.username, "Event-Created")
         for event in calendar[obj.date]:
             if obj.overlapping(event.start_time,event.end_time):
@@ -605,16 +587,14 @@ def broadcast(message):
 
 # Thread to listen to server connection
 def handle_server(server, number):
-    global queuedMessages
+    global calendar
     global queueCounter
     global serverDrops
     global state
     # Set the server's activity as online (since it is connecting to you).
     serverActives[number - 1] = 1
     
-    # See if you need to change leadership
-
-    # Synchronize queued messages across servers
+    # Synchronize calendar log across servers
     qProposal = server.recv(1024)
     qProposal = pickle.loads(qProposal)
     proposalCount = 0
@@ -622,32 +602,25 @@ def handle_server(server, number):
         if isinstance(qProposal[x], list):
             proposalCount += len(qProposal[x])
     localCount = 0
-    for i in queuedMessages:
-        if isinstance(queuedMessages[i], list):
-            localCount += len(queuedMessages[i])
+    for i in calendar:
+        if isinstance(calendar[i], list):
+            localCount += len(calendar[i])
 
-    print(bcolors.OKBLUE + "SYNCHRONIZING with SERVER" + str(number) + bcolors.ENDC)
+    print(bcolors.OKBLUE + "Checking Calendar Log with SERVER" + str(number) + bcolors.ENDC)
     if proposalCount > localCount:
-        queuedMessages = qProposal
+        calendar = qProposal
     
-    # Load user acconts from chat logs
-    for username in queuedMessages.keys():
-        loginStatus[username] = False
-    
-    print(bcolors.OKBLUE + "<LOADED ACCOUNTS" + bcolors.ENDC)
-
     queueCounter +=1
 
-
-
+    print(calendar)
     # Unit test -- see if you synchronized to the right log.
     if (TESTING_PERSISTENCE and queueCounter > 1):
 
-        if messageLogEquals(UNITTESTVERIFY, queuedMessages):
-            print(bcolors.BOLD + bcolors.OKCYAN + "UNIT TEST: SYNCHRONIZES with MOST UPDATED MESSAGE LOG ✅" + bcolors.ENDC)
+        if calendarLogEquals(sim, calendar):
+            print(bcolors.BOLD + bcolors.OKCYAN + "UNIT TEST: SYNCHRONIZES with MOST UPDATED Calendar LOG (SERVER 2) ✅" + bcolors.ENDC)
 
         else:
-            print(bcolors.FAIL + "UNIT TEST: FAILED TO SYNCHRONIZE WITH MOST UPDATED MESSAGE LOG." + bcolors.ENDC)
+            print(bcolors.FAIL + "UNIT TEST: FAILED TO SYNCHRONIZE WITH MOST UPDATED Calendar LOG." + bcolors.ENDC)
 
     while True:
         try:
@@ -667,35 +640,6 @@ def handle_server(server, number):
 # Server thread to handle client <-> server communications
 def handle_client(client, server1, server2):
 
-    # ## Generate account list
-    # allAccounts = 'LA|'
-
-    # for account in loginStatus:
-
-    #     # If username is active
-    #     if loginStatus[account]:
-    #         status = 'active'
-
-    #     # If username is inactive
-    #     else:
-    #         status = 'inactive'
-
-    #     # Add account status to list with "|", as a divider
-    #     allAccounts += account + " ( " + status + " )" + "|"
-
-    # # Remove the last "|" if accounts exists 
-    # if len(allAccounts) > len("LA|"):
-    #     allAccounts = allAccounts[:-1]
-    
-    # # Sends List of all account statuses to client 
-    # message = f"M:_:SERVER:{allAccounts}".encode('utf-8')
-    # header = f"{len(message) :< {HEADER_LENGTH}}".encode('utf-8')
-    # client.send(header+message)
-
-
-    ## Account Register/Login Loop
-
-    # Client starts unauthorized
     client_auth = False
 
     # While user is not authorized attempt to authenticate
@@ -727,10 +671,7 @@ def handle_client(client, server1, server2):
                 clients.append(client)
                 clientID[username] = client
                 loginStatus[username] = True
-                queuedMessages[username] = []
                 
-                with open(filename, 'wb') as handle:
-                    pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
                 message = "C:" + username
                 message = encoded_message(message)
@@ -743,7 +684,6 @@ def handle_client(client, server1, server2):
                 sendToClient(username,"Successful-Account-Creation.")
 
                 # Broadcasts new connection and authenticates connection
-                onConnection(username)
                 client_auth = True
 
 
@@ -782,7 +722,6 @@ def handle_client(client, server1, server2):
                 print("LOGIN SUCCESSFUL!")
 
                 # Broadcast connection and deliver messages and authenticate client
-                onConnection(username)
                 client_auth = True
 
     # Receives buffers from client and applies wire protocol
@@ -792,9 +731,6 @@ def handle_client(client, server1, server2):
             # Applies wire protocol to buffer -> returns a Message() or Command() objects
             obj = protocol_unpack(client)
             if isinstance(obj, Message):
-                queuedMessages[obj.recipient].append(obj)
-                with open(filename, 'wb') as handle:
-                    pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
                 if ME == 0:
                     if serverActives[1] == 1:
                         socket1.send(obj.encode())
@@ -900,24 +836,6 @@ def receive():
 
 
 # onConnection() broadcasts a username and dequeues their messages
-def onConnection(username):
-
-    # User connection broadcast
-    # message = f'{username} has connected to the chat room'
-    # broadcast(message)
-
-    # Dequeing of stored user messages
-    if username in queuedMessages.keys():
-        for message in queuedMessages[username][:]:
-
-            # Finds socket associated with user
-            client = clientID[username]
-
-            # Sends encoded message to that user
-            client.send(message.encode())
-
-            # commenting to send all of the chat history
-            #queuedMessages[username].remove(message)
 
 if __name__ == "__main__":
 
@@ -939,6 +857,5 @@ if __name__ == "__main__":
     socket1.send(pickleMessage)
     socket2.send(pickleMessage)
     if (TESTING_PERSISTENCE):
-        print(bcolors.BOLD + bcolors.OKCYAN + "UNIT TEST: Sends chat history to other servers ✅" + bcolors.ENDC)
-
+        print(bcolors.BOLD + bcolors.OKCYAN + "UNIT TEST: Sends calendar log to other servers ✅" + bcolors.ENDC)
     receive()

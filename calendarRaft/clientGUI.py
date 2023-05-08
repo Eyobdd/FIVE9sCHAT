@@ -16,7 +16,7 @@ import time
 # Defined header length throughout wire protocol
 HEADER_LENGTH = 10
 # HOST = "127.0.0.1"
-HOST = "10.250.92.212"
+HOST = "127.0.0.1"
 SERVERSTATE = 1
 ACTIVECONNECTION = None
 

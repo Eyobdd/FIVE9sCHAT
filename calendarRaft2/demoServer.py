@@ -1,3 +1,8 @@
+####################################################################################################
+# FOR DEMO PURPOSES ONLY == WE MAINLY CHANGED THE HOSTs/PORTs TO CONNECT TO TWO MACHINES.
+####################################################################################################
+
+
 import threading
 import socket
 import sys
@@ -6,8 +11,6 @@ from command import Command
 import time
 import pickle
 import os
-from datetime import datetime
-from event import Event
 
 class bcolors:
     HEADER = '\033[95m'
@@ -21,45 +24,26 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 
-# START socket connections to the two other servers in the system.
 socket1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 socket2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
+
+# Constants
+print("order")
 HEADER_LENGTH = 10
-HOST = '10.250.92.212'
-# HOST = "127.0.0.1"
+HOST = '10.250.209.143'
+HOST2 = '10.250.92.212'
 PORT = int(sys.argv[1])
 
-
-
-# RAFT vars
-state = "F"
-if PORT == 12340:
-    heartbeat = 1
-if PORT == 12341:
-    heartbeat = 0.4
-if PORT == 12342:
-    heartbeat = 2
-
-serverDrops = 0
-voted = False
-votes = 0
-startedHeartBeat = False
-stopwatch = time.perf_counter()
-term = 0
-# number of servers
-N = 3
-
 # UNIT TEST Init
-TESTING_PERSISTENCE = False
 chat3SimHist = "(UNIT_TESTS)persistenceTestChats/12342UNITTESTchatHistory.pickle"
 UNITTESTVERIFY = {}
+TESTING_PERSISTENCE = False
 with open(chat3SimHist, 'rb') as handle:
         UNITTESTVERIFY = pickle.load(handle)
 if sys.argv[2] == "1":
     print("we will be running Unit tests")
     TESTING_PERSISTENCE = True
-
 
 # Connect sockets to server
 myServer = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -91,17 +75,10 @@ loginStatus = {}
 # The server is always online so users cannot log into the server account
 loginStatus['SERVER'] = True
 
-# Will update this in our heart beat
-leader = ''
 
 # Stores all messages to offline users {username: Message()}
 queuedMessages = {}
 queueCounter = 0
-
-# Stores all events {username: Events} pairs
-calendar = {}
-
-# Load queued messages (different case if we are unit testing)
 if (TESTING_PERSISTENCE):
     filename = "(UNIT_TESTS)persistenceTestChats/" + str(PORT) + "UNITTESTchatHistory.pickle"
 else:
@@ -112,97 +89,15 @@ if os.path.isfile(filename):
     if (TESTING_PERSISTENCE):
         print(bcolors.BOLD + bcolors.OKCYAN + "UNIT TEST: Loads own chat history from disk ✅" + bcolors.ENDC)
 else:
+
     queuedMessages = {}
 
-# Convert queued messages into a structure we can send over the sockets.
+
 pickleMessage = pickle.dumps(queuedMessages)
 
- # Make the server active.
 loginStatus['SERVER'] = True
 
-def sendToServers(message):
-    if ME == 0:
-        if serverActives[1] == 1:
-            socket1.send(message)
-        if serverActives[2] == 1:
-            socket2.send(message)
-    if ME == 1:
-        if serverActives[0] == 1:
-            socket1.send(message)
-        if serverActives[2] == 1:
-            socket2.send(message)
-    if ME == 2:
-        if serverActives[1] == 1:
-            socket1.send(message)
-        if serverActives[0] == 1:
-            socket2.send(message)
 
-def getTime():
-    global stopwatch
-    return time.perf_counter() - stopwatch
-
-def resetHeartBeat():
-    global stopwatch
-    stopwatch = time.perf_counter()
-
-def sendHeartBeat():
-    global term
-    message = "E: " + str(term) + ":" + str(PORT)
-    message = encoded_message(message)
-    sendToServers(message)
-
-
-def startElection():
-    global state
-    global term
-    state = "C"
-    term +=1
-    # Request a vote from the other servers.
-    message = "RV:" + str(term) + ":" + str(PORT)
-    message = encoded_message(message)
-    sendToServers(message)
-
-
-def startHeartBeat():
-    global state
-    resetHeartBeat()
-    while True:
-
-        if serverDrops > 1:
-                state = "L"
-
-        if state == "F":
-            if serverDrops > 1:
-                state = "L"
-            t = getTime()
-            if t > heartbeat:
-                print(bcolors.WARNING + "HEARTBEAT" + bcolors.ENDC + str(t))
-                resetHeartBeat()
-                startElection()
-                # transition to be candidate
-                
-        if state == "L":
-            time.sleep(heartbeat)
-            sendHeartBeat()
-
-def sendVoteResponse(response, p):
-        if ME == 0:
-            if p == 12341:
-                socket1.send(response)
-            else:
-                socket2.send(response)
-        elif ME == 1:
-            if p == 12340:
-                socket1.send(response)
-            else:
-                socket2.send(response)
-        elif ME == 2:
-            if p == 12341:
-                socket1.send(response)
-            else:
-                socket2.send(response)
-
-# Equality checking of message logs -- used for unit tests
 def messageLogEquals(d1, d2):
     for u in d1:
         for i in range(len(d1[u])):
@@ -210,7 +105,7 @@ def messageLogEquals(d1, d2):
                 return False
     return True
     
-# Encode the message before sending in sockets
+
 def encoded_message(message):
     message = message.encode('utf-8')
     header = f"{len(message) :< {HEADER_LENGTH}}".encode('utf-8')
@@ -240,41 +135,34 @@ def receiveData(client):
         print(data)
     return data
 
-# Received a message from another server, now act on that message.
-def serverProtocol(data):
-    global state
-    global term
-    global votes
-    global voted
-    global leader
-    resetHeartBeat()
+def receiveDataServer(server):
+    data = server.recv(1024).decode('utf-8')
+    data_length = int(data.strip())
+    data = server.recv(data_length).decode('utf-8')
+    return data
+
+def serverUnpack(data):
+    print(data)
     dataSplit = data.split(":")
     if dataSplit[0] == "M":
         # we have a message -- add it to the queued messages
         m = Message.createMessageFromBuffer(data)
         m.print()
         queuedMessages[m.recipient].append(m)
-
-        # log
         print("QUEUED messages are: ", queuedMessages)
         with open(filename, 'wb') as handle:
             pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     elif dataSplit[0] == "C":
-
-        # account was created on a leader server -- we need to replicate it here
         username = dataSplit[1]
         loginStatus[username] = False
         queuedMessages[username] = []
         print("usernames: ", loginStatus)
-
-        # log
+        
         with open(filename, 'wb') as handle:
             pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     elif dataSplit[0] == "D":
-        # account was deleted on a leader server -- we need to replicate it here
-
         username = dataSplit[1]
         del loginStatus[username]
         del queuedMessages[username]
@@ -282,55 +170,10 @@ def serverProtocol(data):
         print("usernames: ", loginStatus)
         print("QUEUED messages are: ", queuedMessages)
 
-        #log
         with open(filename, 'wb') as handle:
                 pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    elif dataSplit[0] == "E":
-        t = int(dataSplit[1])
-        p = int(dataSplit[2])
-        state = "F"
-        voted = False
-        votes = 0
-        if t > term:
-            term = t
-        leader = p
-        resetHeartBeat()
-    elif dataSplit[0] == "RV":
-        # We recieved a request for a vote
-        print("recieved a request for a vote", data)
-        t = int(dataSplit[1])
-        p = int(dataSplit[2])
-
-        print("term", t)
-        print("port", p)
-        if (not (term > t)) and (not voted):
-            # Accept vote and send acceptance
-
-            print("accepted vote for ", p)
-            response = "VA:" + str(PORT)
-            response = encoded_message(response)
-            sendVoteResponse(response, p)
-        else:
-
-            print("rejected vote for ", p)
-            response = "VR:"
-            response = encoded_message(response)
-            sendVoteResponse(response, p)
-        voted = True
-    elif dataSplit[0] == "VA":
-        print("recieved an acceptance from", dataSplit[1])
-        votes +=1
-        if (1 + votes) >= (N+1)/2 and (state == "C"):
-            #majority votes. Become Leader.
-            state = "L"
-            print(bcolors.BOLD + bcolors.WARNING + "I AM TRUEST LEADER." + bcolors.ENDC)
-
-
-
 
 def protocol_action(obj):
-    # global leader
-    print(leader)
 
     # If the object is a Message() then we try to send the message
     if isinstance(obj, Message):
@@ -366,8 +209,7 @@ def protocol_action(obj):
     
     # If the object is a Command() then we execute the command
     if isinstance(obj, Command):
-        print(obj.actionType)
-        
+
         # If Command type is DA -> Delete Account
         if obj.actionType == "DA":
                 
@@ -380,8 +222,22 @@ def protocol_action(obj):
             sendToClient(obj.username,"Account-Successfully-Deleted")
             message = "D:" + obj.username
             message = encoded_message(message)
-            sendToServers(message)
-            
+            if ME == 0:
+                    if serverActives[1] == 1:
+                        socket1.send(message)
+                    if serverActives[2] == 1:
+                        socket2.send(message)
+            if ME == 1:
+                    if serverActives[0] == 1:
+                        socket1.send(message)
+                    if serverActives[2] == 1:
+                        socket2.send(message)
+            if ME == 2:
+                    if serverActives[1] == 1:
+                        socket1.send(message)
+                    if serverActives[0] == 1:
+                        socket2.send(message)
+           
 
             # Remove user from loginStatus and clientID list
             del loginStatus[obj.username]
@@ -392,40 +248,6 @@ def protocol_action(obj):
             with open(filename, 'wb') as handle:
                 pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
         # If Command type is LA -> Lists all stored accounts with their login status
-        
-        elif obj.actionType == "L":
-            print("OBJ USERNAME:",obj.username)
-            # If user does not exist -> send client login failure message
-            if obj.username not in loginStatus:
-                failed = "Login-Failed"
-                sendToClient(obj.username,failed)
-
-            # If user is already active -> alert client!
-            elif loginStatus[obj.username]:
-                active = "Account-Already-Active"
-                sendToClient(obj.username,active)
-
-            # If username exists and is not active -> log user in
-            else:
-                # Log user in
-                clients.append(obj.socket)
-                usernames.append(obj.username)
-                clientID[obj.username] = obj.socket
-                loginStatus[obj.username] = True
-
-                # Send confirmation message
-                sendToClient(obj.username,"Login-Successful.")
-
-                # Broadcast connection and deliver messages and authenticate client
-                # client_auth = True
-            
-        
-        elif obj.actionType == "SL":
-            print("Leader Port:",obj.data)
-            message = f"SL:{leader}"
-            sendToClient(obj.username,message)
-            
-            
         elif obj.actionType == "LA":
 
             ## Generate account list
@@ -454,116 +276,24 @@ def protocol_action(obj):
             # sendToClient(obj.username, allAccounts.encode())
             sendToClient(obj.username, allAccounts)
 
-        elif obj.actionType == "DE":
-
-            print("calendar before", calendar)
-            title = obj.data.title
-            day = obj.data.date
-
-            try:
-                for event in calendar[day]:
-                    if event.title == title:
-                        calendar[day].remove(event)
-            except Exception as e:
-                print(" so we're trying to delete an event, but an error", e)
-            
-            print("calendar after", calendar)
-            sendToClient(obj.username,"Event-Deleted")
-        elif obj.actionType == "DC":
-            print("Display Calendar Request")
-            calendar_events = "DC|"
-            
-            try:
-                for day in calendar:
-                    print("DAY",day)
-                    for event in calendar[day]:
-                        print("Event:",event)
-                        calendar_events += str(event.title) +"*"+ event.date +"*"+ str(event.start_time) +" - "+ str(event.end_time)+"|"
-            except Exception as e:
-                print("Calendar Events Error:",e)
-            
-            print("EVENTS:",calendar_events)
-            if len(calendar_events) > len("DC|"):
-                calendar_events = calendar_events[:-1]
-            
-            
-            print("Object Username:",obj.username)
-            print("Calendar Events",calendar_events)
-            sendToClient(obj.username, calendar_events)
-            
-            
-            
-    if isinstance(obj, Event):
-        
-        print("EVENT OBJECT:",obj.username)
-        print("Calendar before:",calendar)
-        # Does this startTime have overlapping events
-        try:
-            calendar[obj.date].append(obj)
-        except Exception as error:
-            calendar[obj.date] = []
-            calendar[obj.date].append(obj)
-        
-        sendToClient(obj.username, "Event-Created")
-        for event in calendar[obj.date]:
-            if obj.overlapping(event.start_time,event.end_time):
-                sendToClient(obj.username, "Over-Lapping-Event")
-
-        print("Calendar after:",calendar)
-
 
 # Protocol unpack returns Message() and Command() from protocol buffers
 # Takes a client socket and encoded buffer data
 def protocol_unpack(client):
-    global leader
     # Receives bits from client and converts to buffer(encoded)
     data = receiveData(client)
-    
-    if leader == '':
-        leader = PORT
-    print("HERE IS THE LEADER'S PORT:",leader)
    
     # Buffer data and splits on the colon 
     dataSplit = data.split(":",3)
-    print("Incoming Data:",data)
 
     # Retrieves type of message/command from buffer data
     type_ = dataSplit[0]
-    
-    if type_ == "L":
-        username = dataSplit[1]
-        c = Command.createCommandFromBuffer(client,data,username,type_)
-        print("C is:",c,username)
-        return c
 
     # If type is M -> create and return Message() object
     if type_ == "M":
 
         # Return Message()
         return Message.createMessageFromBuffer(data)
-
-    if type_ == "CE":
-        e = Event.createEventFromBuffer(data)
-        print("E is ", e)
-        return e
-
-    if type_ == "DE":
-
-        print("receiving a delete action (unpack)")
-        username = dataSplit[1]
-        title = dataSplit[2]
-        day = dataSplit[3]
-        start_time = "0"
-        end_time = "0"
-        
-        e = Event(username, title, day, start_time, end_time)
-        return Command.createCommandFromBuffer(client, e, username, type_)
-
-    if type_ == "SL":
-        # Get username from buffer
-        username = dataSplit[1]
-        
-        return Command.createCommandFromBuffer(client,leader,username,type_)
 
     # If type is LA -> create and return Command() object
     elif type_ == "LA":
@@ -583,11 +313,7 @@ def protocol_unpack(client):
         # Return Command() 
         return Command.createCommandFromBuffer(client, None ,username,type_)
     
-    elif type_ == "DC":
-        username = dataSplit[1]
-        
-        return Command.createCommandFromBuffer(client,calendar,username,type_)
-    
+
 # Function sends a message to all active accounts 
 def broadcast(message):
     
@@ -601,20 +327,26 @@ def broadcast(message):
         # # Sends message to user
         sendToClient(username,message)
 
-# Finds most recent active server (in the order of server 1,2,3)
+def findLeader():
+    if serverActives[0] == 1:
+        return 1
+    elif serverActives[1] == 1:
+        return 2
+    elif serverActives[2] == 1:
+        return 3 
 
-# Thread to listen to server connection
 def handle_server(server, number):
+    # if server 1 is connecting to you, then set its activity status to True
     global queuedMessages
     global queueCounter
-    global serverDrops
-    global state
-    # Set the server's activity as online (since it is connecting to you).
     serverActives[number - 1] = 1
     
-    # See if you need to change leadership
+    # see if you need to change leadership
+    leader = findLeader()
+    print("LEADER IS SERVER", leader)
 
-    # Synchronize queued messages across servers
+
+    # Do a one-time receive to synchronize queued messages across servers
     qProposal = server.recv(1024)
     qProposal = pickle.loads(qProposal)
     proposalCount = 0
@@ -629,18 +361,14 @@ def handle_server(server, number):
     print(bcolors.OKBLUE + "SYNCHRONIZING with SERVER" + str(number) + bcolors.ENDC)
     if proposalCount > localCount:
         queuedMessages = qProposal
-    
-    # Load user acconts from chat logs
-    for username in queuedMessages.keys():
-        loginStatus[username] = False
+        print("UPDATED DATA")
     
     print(bcolors.OKBLUE + "<LOADED ACCOUNTS" + bcolors.ENDC)
 
+    for username in queuedMessages.keys():
+        loginStatus[username] = False
     queueCounter +=1
 
-
-
-    # Unit test -- see if you synchronized to the right log.
     if (TESTING_PERSISTENCE and queueCounter > 1):
 
         if messageLogEquals(UNITTESTVERIFY, queuedMessages):
@@ -652,45 +380,46 @@ def handle_server(server, number):
     while True:
         try:
             data = receiveData(server)
-            serverProtocol(data)
+            serverUnpack(data)
         # This exception handles client crashes and logouts
         except Exception as e:
-            serverDrops += 1
-            print(bcolors.WARNING + "NUMBER OF SERVERDROPS " + str(serverDrops) + bcolors.ENDC)
-            if serverDrops > 1:
-                state = "L"
-            
+            # Update leader after the server drops
             serverActives[number - 1] = 0
+            leader = findLeader()
+            print(bcolors.WARNING + "LEADER IS NOW: "  + str(leader) + bcolors.ENDC )
             server.close()
             return
 
 # Server thread to handle client <-> server communications
 def handle_client(client, server1, server2):
 
-    # ## Generate account list
-    # allAccounts = 'LA|'
+    # Displays All accounts and statuses when the client connects
 
-    # for account in loginStatus:
 
-    #     # If username is active
-    #     if loginStatus[account]:
-    #         status = 'active'
+    ## Generate account list
+    allAccounts = 'LA|'
 
-    #     # If username is inactive
-    #     else:
-    #         status = 'inactive'
+    for account in loginStatus:
 
-    #     # Add account status to list with "|", as a divider
-    #     allAccounts += account + " ( " + status + " )" + "|"
+        # If username is active
+        if loginStatus[account]:
+            status = 'active'
 
-    # # Remove the last "|" if accounts exists 
-    # if len(allAccounts) > len("LA|"):
-    #     allAccounts = allAccounts[:-1]
+        # If username is inactive
+        else:
+            status = 'inactive'
+
+        # Add account status to list with "|", as a divider
+        allAccounts += account + " ( " + status + " )" + "|"
+
+    # Remove the last "|" if accounts exists 
+    if len(allAccounts) > len("LA|"):
+        allAccounts = allAccounts[:-1]
     
-    # # Sends List of all account statuses to client 
-    # message = f"M:_:SERVER:{allAccounts}".encode('utf-8')
-    # header = f"{len(message) :< {HEADER_LENGTH}}".encode('utf-8')
-    # client.send(header+message)
+    # Sends List of all account statuses to client 
+    message = f"M:_:SERVER:{allAccounts}".encode('utf-8')
+    header = f"{len(message) :< {HEADER_LENGTH}}".encode('utf-8')
+    client.send(header+message)
 
 
     ## Account Register/Login Loop
@@ -703,7 +432,7 @@ def handle_client(client, server1, server2):
          
         # Recieve client Command -- Either type CA (Create Account) or L(Login)
         data = receiveData(client)
-        print("User message:",data)
+
         # Split buffer data and extract the username and type that were sent   
         data = data.split(":",3)
         type_ = data[0]
@@ -721,7 +450,7 @@ def handle_client(client, server1, server2):
 
             # If username doesn't exist -> Send client account creation confirmation
             else:
-                print("ACCOUNT CREATED")
+
                 # Adds user to the server and logs them in
                 usernames.append(username)
                 clients.append(client)
@@ -749,25 +478,18 @@ def handle_client(client, server1, server2):
 
         # If type is L -> attempt to Login in with username
         elif type_ == "L":
-            print("LOGGED IN")
 
             # If user does not exist -> send client login failure message
             if username not in loginStatus:
                 failed = "Login-Failed"
                 failed = Message(username,"SERVER", failed)
                 client.send(failed.encode())
-                print("LOGIN FAILED![sent to",client,"]")
-            
-            # TODO Allowing user to be authenticated even if someone else is logged in
-            # TODO As primary servers switch user must still stay authenticated
+
             # If user is already active -> alert client!
             elif loginStatus[username]:
                 active = "Account-Already-Active"
                 active = Message(username, "SERVER", active)
                 client.send(active.encode())
-                print("ACCOUNT ALREADY ACTIVE!")
-                client_auth = True
-
 
             # If username exists and is not active -> log user in
             else:
@@ -779,7 +501,6 @@ def handle_client(client, server1, server2):
 
                 # Send confirmation message
                 sendToClient(username,"Login-Successful.")
-                print("LOGIN SUCCESSFUL!")
 
                 # Broadcast connection and deliver messages and authenticate client
                 onConnection(username)
@@ -835,20 +556,17 @@ def handle_client(client, server1, server2):
             break
 
 
-# receive() listens for client and server connections and starts new threads when found
+# receive() listens for client connections and starts new threads when found
 def receive():
-    global queueCounter
-    global leader
-    global state
-    # If not a leader -- close connection with client and respond with the leader.
-
     # When server starts
     print('Openning connection, running, and listening ...')
-    
+
     while True:
+
         # Accepts new client on client connection
         client, address = myServer.accept()
         # Logs client connection information
+        print(f'connection is established with: {str(address)}')
         connection = ''
         if str(address[1]) == '12349' or str(address[1]) == '12346':
             connection = "SERVER1"
@@ -871,30 +589,10 @@ def receive():
         else:
             # Open up a receiving thread with the client
             connection = "CLIENT"
-            if state == "F" or state == "C":
-                print(bcolors.WARNING + "I AM A FOLLOWER/CANDIDATE AND A CLIENT ATTEMPTED TO CONNECT." + bcolors.ENDC)
-                print("SENDING TO(F|C):",client,"LEADER:",leader)
-                message = "WL:" + str(leader)
-                message = Message(" ", "SERVER", message)
-                message = message.encode()
-                client.send(message)
-                client.close()
-            else:
-                print("ACCPETING A CONNECTION FROM A CLIENT B/C I AM STATE: ", state)
-                print("SENDING TO(L):",client,"LEADER",leader)
-
-                message = "WL:" + str(leader)
-                message = Message(" ", "SERVER", message)
-                message = message.encode()
-                client.send(message)
-                thread = threading.Thread(target=handle_client, args=(client, servers[0], servers[1]))
-                thread.start()
-        
-        if not startedHeartBeat and (queueCounter > 1):
-            thread = threading.Thread(target=startHeartBeat)
+            thread = threading.Thread(target=handle_client, args=(client, servers[0], servers[1]))
             thread.start()
         
-        print((f'connection is established with: {connection}'))
+        print((f'connection is established with :{connection}'))
 
 
 
@@ -903,8 +601,8 @@ def receive():
 def onConnection(username):
 
     # User connection broadcast
-    # message = f'{username} has connected to the chat room'
-    # broadcast(message)
+    message = f'{username} has connected to the chat room'
+    broadcast(message)
 
     # Dequeing of stored user messages
     if username in queuedMessages.keys():
@@ -928,8 +626,8 @@ if __name__ == "__main__":
     # attempt to connect to the three servers
     print("MY PORT IS ", PORT)
     if PORT == 12340:
-        socket1.connect((HOST, 12341))
-        socket2.connect((HOST, 12342))
+        socket1.connect((HOST2, 12341))
+        socket2.connect((HOST2, 12342))
     elif PORT == 12341:
         socket1.connect((HOST, 12340))
         socket2.connect((HOST, 12342))

@@ -26,8 +26,7 @@ socket1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 socket2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 HEADER_LENGTH = 10
-HOST = '10.250.92.212'
-# HOST = "127.0.0.1"
+HOST = '127.0.0.1'
 PORT = int(sys.argv[1])
 
 
@@ -39,7 +38,7 @@ if PORT == 12340:
 if PORT == 12341:
     heartbeat = 0.4
 if PORT == 12342:
-    heartbeat = 2
+    heartbeat = 1.5
 
 serverDrops = 0
 voted = False
@@ -329,8 +328,6 @@ def serverProtocol(data):
 
 
 def protocol_action(obj):
-    # global leader
-    print(leader)
 
     # If the object is a Message() then we try to send the message
     if isinstance(obj, Message):
@@ -366,8 +363,7 @@ def protocol_action(obj):
     
     # If the object is a Command() then we execute the command
     if isinstance(obj, Command):
-        print(obj.actionType)
-        
+
         # If Command type is DA -> Delete Account
         if obj.actionType == "DA":
                 
@@ -392,40 +388,6 @@ def protocol_action(obj):
             with open(filename, 'wb') as handle:
                 pickle.dump(queuedMessages, handle, protocol=pickle.HIGHEST_PROTOCOL)
         # If Command type is LA -> Lists all stored accounts with their login status
-        
-        elif obj.actionType == "L":
-            print("OBJ USERNAME:",obj.username)
-            # If user does not exist -> send client login failure message
-            if obj.username not in loginStatus:
-                failed = "Login-Failed"
-                sendToClient(obj.username,failed)
-
-            # If user is already active -> alert client!
-            elif loginStatus[obj.username]:
-                active = "Account-Already-Active"
-                sendToClient(obj.username,active)
-
-            # If username exists and is not active -> log user in
-            else:
-                # Log user in
-                clients.append(obj.socket)
-                usernames.append(obj.username)
-                clientID[obj.username] = obj.socket
-                loginStatus[obj.username] = True
-
-                # Send confirmation message
-                sendToClient(obj.username,"Login-Successful.")
-
-                # Broadcast connection and deliver messages and authenticate client
-                # client_auth = True
-            
-        
-        elif obj.actionType == "SL":
-            print("Leader Port:",obj.data)
-            message = f"SL:{leader}"
-            sendToClient(obj.username,message)
-            
-            
         elif obj.actionType == "LA":
 
             ## Generate account list
@@ -469,34 +431,9 @@ def protocol_action(obj):
             
             print("calendar after", calendar)
             sendToClient(obj.username,"Event-Deleted")
-        elif obj.actionType == "DC":
-            print("Display Calendar Request")
-            calendar_events = "DC|"
-            
-            try:
-                for day in calendar:
-                    print("DAY",day)
-                    for event in calendar[day]:
-                        print("Event:",event)
-                        calendar_events += str(event.title) +"*"+ event.date +"*"+ str(event.start_time) +" - "+ str(event.end_time)+"|"
-            except Exception as e:
-                print("Calendar Events Error:",e)
-            
-            print("EVENTS:",calendar_events)
-            if len(calendar_events) > len("DC|"):
-                calendar_events = calendar_events[:-1]
-            
-            
-            print("Object Username:",obj.username)
-            print("Calendar Events",calendar_events)
-            sendToClient(obj.username, calendar_events)
-            
-            
-            
     if isinstance(obj, Event):
         
         print("EVENT OBJECT:",obj.username)
-        print("Calendar before:",calendar)
         # Does this startTime have overlapping events
         try:
             calendar[obj.date].append(obj)
@@ -509,32 +446,18 @@ def protocol_action(obj):
             if obj.overlapping(event.start_time,event.end_time):
                 sendToClient(obj.username, "Over-Lapping-Event")
 
-        print("Calendar after:",calendar)
-
 
 # Protocol unpack returns Message() and Command() from protocol buffers
 # Takes a client socket and encoded buffer data
 def protocol_unpack(client):
-    global leader
     # Receives bits from client and converts to buffer(encoded)
     data = receiveData(client)
-    
-    if leader == '':
-        leader = PORT
-    print("HERE IS THE LEADER'S PORT:",leader)
    
     # Buffer data and splits on the colon 
     dataSplit = data.split(":",3)
-    print("Incoming Data:",data)
 
     # Retrieves type of message/command from buffer data
     type_ = dataSplit[0]
-    
-    if type_ == "L":
-        username = dataSplit[1]
-        c = Command.createCommandFromBuffer(client,data,username,type_)
-        print("C is:",c,username)
-        return c
 
     # If type is M -> create and return Message() object
     if type_ == "M":
@@ -559,11 +482,6 @@ def protocol_unpack(client):
         e = Event(username, title, day, start_time, end_time)
         return Command.createCommandFromBuffer(client, e, username, type_)
 
-    if type_ == "SL":
-        # Get username from buffer
-        username = dataSplit[1]
-        
-        return Command.createCommandFromBuffer(client,leader,username,type_)
 
     # If type is LA -> create and return Command() object
     elif type_ == "LA":
@@ -582,11 +500,6 @@ def protocol_unpack(client):
 
         # Return Command() 
         return Command.createCommandFromBuffer(client, None ,username,type_)
-    
-    elif type_ == "DC":
-        username = dataSplit[1]
-        
-        return Command.createCommandFromBuffer(client,calendar,username,type_)
     
 # Function sends a message to all active accounts 
 def broadcast(message):
@@ -721,7 +634,7 @@ def handle_client(client, server1, server2):
 
             # If username doesn't exist -> Send client account creation confirmation
             else:
-                print("ACCOUNT CREATED")
+
                 # Adds user to the server and logs them in
                 usernames.append(username)
                 clients.append(client)
@@ -749,7 +662,6 @@ def handle_client(client, server1, server2):
 
         # If type is L -> attempt to Login in with username
         elif type_ == "L":
-            print("LOGGED IN")
 
             # If user does not exist -> send client login failure message
             if username not in loginStatus:
@@ -757,17 +669,13 @@ def handle_client(client, server1, server2):
                 failed = Message(username,"SERVER", failed)
                 client.send(failed.encode())
                 print("LOGIN FAILED![sent to",client,"]")
-            
-            # TODO Allowing user to be authenticated even if someone else is logged in
-            # TODO As primary servers switch user must still stay authenticated
+
             # If user is already active -> alert client!
             elif loginStatus[username]:
                 active = "Account-Already-Active"
                 active = Message(username, "SERVER", active)
                 client.send(active.encode())
                 print("ACCOUNT ALREADY ACTIVE!")
-                client_auth = True
-
 
             # If username exists and is not active -> log user in
             else:
@@ -903,8 +811,8 @@ def receive():
 def onConnection(username):
 
     # User connection broadcast
-    # message = f'{username} has connected to the chat room'
-    # broadcast(message)
+    message = f'{username} has connected to the chat room'
+    broadcast(message)
 
     # Dequeing of stored user messages
     if username in queuedMessages.keys():

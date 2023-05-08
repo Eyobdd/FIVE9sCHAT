@@ -13,21 +13,19 @@ class Event:
 
     @staticmethod
     def createEventFromBuffer(data):
-        dataSplit = data.split(":",4)
+        dataSplit = data.split(":",5)
         
+        print("EARLIER.")
         print(data)
         print(dataSplit)
-        print("EARLIER.",dataSplit)
         username = dataSplit[1]
         title = dataSplit[2]
         date = dataSplit[3]
-        time = dataSplit[4]
-        start_time, end_time = time.split("-")
+        start_time = dataSplit[4]
+        end_time = dataSplit[5]
 
         print("EVENT. ")
         print(username) 
         print(title) 
         print(date)
-        print(start_time)
-        print(end_time)
         return Event(username, title, date, start_time, end_time)
